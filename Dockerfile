@@ -11,9 +11,6 @@ COPY tsconfig.json ./
 # Install ALL dependencies (including dev dependencies for build)
 # Use npm install if package-lock.json doesn't exist, otherwise use npm ci
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi && npm cache clean --force
-=======
-RUN npm ci && npm cache clean --force
->>>>>>> 825a3d74d878e66cefba664a7072c5239647a61f
 
 # Copy source code
 COPY src/ ./src/
