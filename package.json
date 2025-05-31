@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "build:alt": "node build.js",
+    "build:alt": "node build.cjs",
     "setup": "node setup.js",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
@@ -14,8 +14,9 @@
     "format": "prettier --write src/**/*.ts",
     "test": "jest",
     "test:watch": "jest --watch",
-    "type-check": "tsc --noEmit"
-  },
+    "type-check": "tsc --noEmit",
+    "start:prod": "npm run build:alt && npm run start"
+    },
   "keywords": [
     "n8n",
     "mcp",

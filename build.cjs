@@ -50,7 +50,8 @@ console.log('🚀 Starting n8n MCP Server (JavaScript version)...');
 console.log('⚠️  For full functionality, please run: npm run build && npm start');
 
 // Check for required environment variables
-require('dotenv').config();
+import dotenv from 'dotenv';
+dotenv.config();
 
 const requiredEnvVars = ['N8N_BASE_URL', 'N8N_API_KEY'];
 const missingVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
@@ -77,10 +78,17 @@ setInterval(() => {
 }, 1000);
 `;
 
+// Only create fallback if TypeScript compilation didn't produce server.js
 const serverJsPath = path.join(distDir, 'server.js');
+const serverExists = fs.existsSync(serverJsPath);
+
+if (!serverExists) {
 fs.writeFileSync(serverJsPath, serverJs);
 fs.chmodSync(serverJsPath, '755');
 console.log('✅ Created fallback server.js');
+} else {
+  console.log('✅ TypeScript-compiled server.js already exists');
+}
 
 console.log('');
 console.log('🎉 Setup complete!');
