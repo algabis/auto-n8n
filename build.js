@@ -1,27 +1,43 @@
 #!/usr/bin/env node
 
+const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-console.log('🔧 Setting up n8n MCP Server...');
+console.log('🔨 Building n8n MCP Server...');
 
-// Create dist directory if it doesn't exist
+// Ensure dist directory exists
 const distDir = path.join(__dirname, 'dist');
 if (!fs.existsSync(distDir)) {
   fs.mkdirSync(distDir, { recursive: true });
-  console.log('✅ Created dist directory');
 }
 
-// Check if .env file exists
-const envFile = path.join(__dirname, '.env');
-const envExample = path.join(__dirname, 'env.example');
+try {
+  // Check if TypeScript is installed
+  try {
+    execSync('npx tsc --version', { stdio: 'pipe' });
+  } catch (error) {
+    console.error('❌ TypeScript not found. Installing...');
+    execSync('npm install typescript', { stdio: 'inherit' });
+  }
 
-if (!fs.existsSync(envFile) && fs.existsSync(envExample)) {
-  fs.copyFileSync(envExample, envFile);
-  console.log('✅ Created .env file from example');
-  console.log('⚠️  Please edit .env with your n8n instance details');
-} else if (!fs.existsSync(envFile)) {
-  console.log('⚠️  Please create .env file with your n8n configuration');
+  // Compile TypeScript
+  console.log('📦 Compiling TypeScript...');
+  execSync('npx tsc', { stdio: 'inherit' });
+  
+  console.log('✅ Build completed successfully!');
+  console.log('📁 Output directory: ./dist/');
+  
+  // List built files
+  const files = fs.readdirSync(distDir);
+  console.log('📄 Built files:');
+  files.forEach(file => {
+    console.log(`   - ${file}`);
+  });
+
+} catch (error) {
+  console.error('❌ Build failed:', error.message);
+  process.exit(1);
 }
 
 // Create a simple JavaScript version of the server for immediate use
