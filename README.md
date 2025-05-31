@@ -53,7 +53,7 @@ A comprehensive Model Context Protocol (MCP) server for n8n workflow automation.
 ### Quick Start
 1. **Clone the repository:**
 ```bash
-git clone <repository-url>
+git clone https://github.com/algabis/n8n-mcp
 cd n8n-mcp
 ```
 
@@ -202,7 +202,7 @@ make clean     # Cleanup everything
 
 1. **Clone and install dependencies:**
 ```bash
-git clone <repository-url>
+git clone https://github.com/algabis/n8n-mcp
 cd n8n-mcp
 npm install
 ```
