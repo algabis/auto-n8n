@@ -86,6 +86,58 @@ export interface N8nProject {
     name: string;
     type?: string;
 }
+export interface N8nUser {
+    id?: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    isPending?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+    role?: string;
+}
+export interface N8nUserCreateRequest {
+    email: string;
+    role: 'global:admin' | 'global:member';
+}
+export interface N8nUserCreateResponse {
+    user: {
+        id: string;
+        email: string;
+        inviteAcceptUrl: string;
+        emailSent: boolean;
+    };
+    error?: string;
+}
+export interface N8nSourceControlPullRequest {
+    force?: boolean;
+    variables?: Record<string, string>;
+}
+export interface N8nImportResult {
+    variables?: {
+        added: string[];
+        changed: string[];
+    };
+    credentials?: Array<{
+        id: string;
+        name: string;
+        type: string;
+    }>;
+    workflows?: Array<{
+        id: string;
+        name: string;
+    }>;
+    tags?: {
+        tags: Array<{
+            id: string;
+            name: string;
+        }>;
+        mappings: Array<{
+            workflowId: string;
+            tagId: string;
+        }>;
+    };
+}
 export interface N8nClientConfig {
     baseUrl: string;
     apiKey: string;
@@ -130,6 +182,7 @@ export declare class N8nClient {
         limit?: number;
         cursor?: string;
     }): Promise<PaginatedResponse<N8nTag>>;
+    getTag(id: string): Promise<N8nTag>;
     createTag(tag: {
         name: string;
     }): Promise<N8nTag>;
@@ -161,6 +214,17 @@ export declare class N8nClient {
         name: string;
     }): Promise<void>;
     deleteProject(id: string): Promise<void>;
+    getUsers(params?: {
+        limit?: number;
+        cursor?: string;
+        includeRole?: boolean;
+        projectId?: string;
+    }): Promise<PaginatedResponse<N8nUser>>;
+    getUser(identifier: string, includeRole?: boolean): Promise<N8nUser>;
+    createUsers(users: N8nUserCreateRequest[]): Promise<N8nUserCreateResponse[]>;
+    deleteUser(identifier: string): Promise<void>;
+    changeUserRole(identifier: string, newRoleName: 'global:admin' | 'global:member'): Promise<void>;
+    pullFromSourceControl(pullRequest: N8nSourceControlPullRequest): Promise<N8nImportResult>;
     createCredential(credential: {
         name: string;
         type: string;

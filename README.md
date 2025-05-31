@@ -1,269 +1,525 @@
 # n8n MCP Server
 
-A comprehensive **Model Context Protocol (MCP) server** for n8n workflow automation, debugging, and management. This server enables AI assistants to interact with your self-hosted n8n instance through a rich set of tools and capabilities.
+A comprehensive Model Context Protocol (MCP) server for n8n workflow automation. This server enables AI assistants to interact with self-hosted n8n instances through a standardized protocol, providing tools for workflow management, execution monitoring, and system administration.
 
-## 🚀 Features
+## Features
 
-### Workflow Management
-- **List & Browse**: Find workflows by name, tags, status, or project
-- **Create & Update**: Build workflows programmatically with nodes and connections
-- **Activate/Deactivate**: Control workflow execution status
-- **Transfer**: Move workflows between projects (Enterprise)
-- **Delete**: Remove workflows with confirmation
+### 🔧 Workflow Management
+- List, create, update, and delete workflows
+- Activate/deactivate workflows
+- Transfer workflows between projects (Enterprise)
+- Manage workflow tags and organization
 
-### Execution Monitoring
-- **List Executions**: Monitor workflow runs with filtering by status, workflow, or project
-- **Detailed Analysis**: Get comprehensive execution data including errors and performance
-- **Debug Support**: Analyze failed executions with detailed error information
-- **Cleanup**: Delete execution records for data management
+### 📊 Execution Monitoring
+- Monitor workflow executions in real-time
+- View detailed execution logs and debugging information
+- Track execution performance and duration
+- Delete execution history
 
-### Organization & Management
-- **Tags**: Create, update, and manage workflow tags for organization
-- **Variables**: Manage environment variables for workflow configuration
-- **Projects**: Handle project organization (Enterprise feature)
-- **Credentials**: Secure credential management for workflow authentication
+### 🏷️ Organization & Management
+- Tag management for workflow organization
+- Environment variable management
+- Project management (Enterprise features)
+- Credential management with security
 
-### Security & Audit
-- **Security Audits**: Generate comprehensive security reports
-- **Risk Assessment**: Identify potential vulnerabilities and unused resources
-- **Compliance**: Monitor security best practices across your n8n instance
+### 🔒 Security & Auditing
+- Generate comprehensive security audit reports
+- Identify security risks and vulnerabilities
+- Monitor unused credentials and abandoned workflows
+- Database and filesystem security analysis
 
-## 📋 Prerequisites
+### 👥 User Management (Enterprise)
+- List and manage users in your n8n instance
+- Create and invite new team members
+- Manage user roles and permissions
+- Delete user accounts
 
-- **Node.js** 18.0.0 or higher
-- **n8n instance** (self-hosted) with API access enabled
-- **n8n API key** with appropriate permissions
+### 🔄 Source Control Integration
+- Pull changes from connected Git repositories
+- Sync workflows and configurations
+- Manage environment variables during deployment
+- Handle merge conflicts and versioning
 
-## 🛠️ Installation
+## Installation
 
-### 1. Clone and Setup
+### Prerequisites
+- Self-hosted n8n instance with API access
+- n8n API key
+- **Option 1 (Docker - Recommended)**: Docker and Docker Compose
+- **Option 2 (Native)**: Node.js 18.0.0 or higher, npm or yarn
 
+## 🐳 Docker Installation (Recommended)
+
+### Quick Start
+1. **Clone the repository:**
 ```bash
 git clone <repository-url>
-cd n8n-mcp-server
-npm install
+cd n8n-mcp
 ```
 
-### 2. Configuration
-
-Copy the example environment file and configure your settings:
-
-```bash
-cp env.example .env
-```
-
-Edit `.env` with your n8n instance details:
-
+2. **Configure environment variables:**
+Create a `.env` file in the project root:
 ```env
-# n8n Instance Configuration (REQUIRED)
+# n8n API Configuration (REQUIRED)
 N8N_BASE_URL=https://your-n8n-instance.com
 N8N_API_KEY=your-api-key-here
 
 # Optional Configuration
-LOG_LEVEL=info
 REQUEST_TIMEOUT=30000
 MAX_RETRY_ATTEMPTS=3
-CACHE_TTL=300
-NODE_ENV=production
+LOG_LEVEL=info
 ```
 
-### 3. Build and Start
+3. **Build and run with Docker Compose:**
+```bash
+# Quick setup (build + run)
+make setup
+
+# Or manually:
+docker-compose up --build -d
+```
+
+4. **Check status:**
+```bash
+make status
+# or
+docker-compose ps
+```
+
+### Docker Commands
 
 ```bash
-# Build the TypeScript code
+# Build the image
+make build
+
+# Run in background
+make run
+
+# Run in foreground (with logs)
+make run-fg
+
+# View logs
+make logs
+
+# Stop container
+make stop
+
+# Restart
+make restart
+
+# Get shell access
+make shell
+
+# Clean up everything
+make clean
+
+# Test the image
+make test-image
+```
+
+### Alternative Installation Methods
+
+#### Quick Comparison
+
+| Method | Best For | Pros | Cons |
+|--------|----------|------|------|
+| **Deployment Scripts** | First-time users, Production | Auto-validation, Error handling, Cross-platform | Requires script execution permissions |
+| **Docker Compose** | Development, Simple setups | Easy configuration, Built-in services | Manual validation needed |
+| **Make Commands** | Linux/Mac developers | Simple commands, Traditional workflow | Linux/Mac only |
+| **Direct Docker** | Advanced users, Custom setups | Full control, Minimal dependencies | Manual configuration required |
+| **Native Installation** | Development, Debugging | Direct access, Fast iteration | Manual dependency management |
+
+#### Method 1: Deployment Scripts (Recommended)
+Use our intelligent deployment scripts with built-in validation and error handling.
+
+**Features:**
+- ✅ Automatic Docker installation validation
+- ✅ Environment variable validation
+- ✅ n8n API connectivity testing
+- ✅ Colored output and progress indicators
+- ✅ Comprehensive error handling
+- ✅ Cross-platform support
+
+**Linux/Mac:**
+```bash
+# Make script executable (first time only)
+chmod +x deploy.sh
+
+# Quick setup with validation
+./deploy.sh setup
+
+# Other commands
+./deploy.sh logs      # View logs
+./deploy.sh stop      # Stop container
+./deploy.sh restart   # Restart container
+./deploy.sh status    # Check container status
+./deploy.sh shell     # Get shell access
+./deploy.sh clean     # Complete cleanup
+./deploy.sh help      # Show all commands
+```
+
+**Windows PowerShell:**
+```powershell
+# Quick setup with validation
+.\deploy.ps1 setup
+
+# Other commands
+.\deploy.ps1 logs      # View logs
+.\deploy.ps1 stop      # Stop container
+.\deploy.ps1 restart   # Restart container
+.\deploy.ps1 status    # Check container status
+.\deploy.ps1 shell     # Get shell access
+.\deploy.ps1 clean     # Complete cleanup
+.\deploy.ps1 help      # Show all commands
+```
+
+#### Method 2: Direct Docker Run
+```bash
+# Build and run manually
+docker build -t n8n-mcp .
+docker run -d --name n8n-mcp-server \
+  --env-file .env \
+  --restart unless-stopped \
+  n8n-mcp:latest
+```
+
+#### Method 3: Using Make (Linux/Mac)
+```bash
+# All-in-one setup
+make setup
+
+# Individual commands
+make build     # Build image
+make run       # Start container
+make logs      # View logs
+make stop      # Stop container
+make clean     # Cleanup everything
+```
+
+## 📦 Native Installation
+
+### Setup
+
+1. **Clone and install dependencies:**
+```bash
+git clone <repository-url>
+cd n8n-mcp
+npm install
+```
+
+2. **Configure environment variables:**
+Create a `.env` file (same as Docker setup above)
+
+3. **Build the project:**
+```bash
 npm run build
+```
 
-# Start the server
+4. **Start the server:**
+```bash
 npm start
+```
 
-# Or for development with auto-reload
+For development with auto-reload:
+```bash
 npm run dev
 ```
 
-## 🔧 MCP Client Configuration
+## Configuration
+
+### n8n API Setup
+1. Access your n8n instance admin panel
+2. Navigate to Settings → API
+3. Generate a new API key
+4. Copy the API key to your `.env` file
+
+### Environment Variables
+| Variable | Description | Default | Validation |
+|----------|-------------|---------|------------|
+| `N8N_BASE_URL` | Base URL of your n8n instance | Required | Must start with http:// or https:// |
+| `N8N_API_KEY` | n8n API key for authentication | Required | Must not be empty |
+| `REQUEST_TIMEOUT` | API request timeout in milliseconds | 30000 | Optional |
+| `MAX_RETRY_ATTEMPTS` | Number of retry attempts for failed requests | 3 | Optional |
+| `LOG_LEVEL` | Logging level (info, debug, warn, error) | info | Optional |
+
+### Automatic Validation
+When using deployment scripts, the following validations are performed:
+- ✅ Docker installation and daemon status
+- ✅ Required environment variables presence
+- ✅ n8n URL format validation
+- ✅ Optional API connectivity test
+- ✅ Container health monitoring
+
+## Available Tools
+
+### Workflow Tools
+
+#### `workflow_list`
+List all workflows with filtering options.
+```json
+{
+  "active": true,
+  "tags": "production,staging",
+  "name": "Data Processing",
+  "limit": 50
+}
+```
+
+#### `workflow_get`
+Get detailed information about a specific workflow.
+```json
+{
+  "id": "workflow-id-here",
+  "excludePinnedData": true
+}
+```
+
+#### `workflow_create`
+Create a new workflow programmatically.
+```json
+{
+  "name": "My New Workflow",
+  "nodes": [
+    {
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "position": [250, 300]
+    }
+  ],
+  "connections": {},
+  "active": false
+}
+```
+
+#### `workflow_activate` / `workflow_deactivate`
+Control workflow activation status.
+```json
+{
+  "id": "workflow-id-here"
+}
+```
+
+### Execution Tools
+
+#### `execution_list`
+Monitor workflow executions with filtering.
+```json
+{
+  "status": "error",
+  "workflowId": "workflow-id",
+  "includeData": false,
+  "limit": 100
+}
+```
+
+#### `execution_get`
+Get detailed execution information for debugging.
+```json
+{
+  "id": "execution-id-here",
+  "includeData": true
+}
+```
+
+### Tag Management
+
+#### `tag_create`
+Create organization tags for workflows.
+```json
+{
+  "name": "Production"
+}
+```
+
+#### `workflow_tags_update`
+Assign tags to workflows for organization.
+```json
+{
+  "id": "workflow-id",
+  "tagIds": ["tag-id-1", "tag-id-2"]
+}
+```
+
+### Variable Management
+
+#### `variable_create`
+Create environment variables for workflows.
+```json
+{
+  "key": "API_ENDPOINT",
+  "value": "https://api.example.com"
+}
+```
+
+### Security & Auditing
+
+#### `audit_generate`
+Generate comprehensive security audit reports.
+```json
+{
+  "additionalOptions": {
+    "daysAbandonedWorkflow": 90,
+    "categories": ["credentials", "database", "nodes"]
+  }
+}
+```
+
+## MCP Client Integration
 
 ### Claude Desktop
 
-Add to your Claude Desktop configuration file:
-
-**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-
+#### Native Installation
 ```json
 {
   "mcpServers": {
-    "n8n-workflow-manager": {
+    "n8n": {
       "command": "node",
-      "args": ["/path/to/n8n-mcp-server/dist/server.js"],
+      "args": ["path/to/n8n-mcp/dist/server.js"],
       "env": {
         "N8N_BASE_URL": "https://your-n8n-instance.com",
-        "N8N_API_KEY": "your-api-key-here"
+        "N8N_API_KEY": "your-api-key"
       }
     }
   }
 }
 ```
 
-### Cursor IDE
-
-Add to your Cursor MCP configuration:
-
+#### Docker Installation
 ```json
 {
   "mcpServers": {
     "n8n": {
-      "command": "node",
-      "args": ["/path/to/n8n-mcp-server/dist/server.js"],
-      "env": {
-        "N8N_BASE_URL": "https://your-n8n-instance.com",
-        "N8N_API_KEY": "your-api-key-here"
-      }
+      "command": "docker",
+      "args": [
+        "run", "--rm", "-i",
+        "--env-file", "/path/to/your/.env",
+        "n8n-mcp:latest"
+      ]
+    }
+  }
+}
+```
+
+#### Docker Compose
+```json
+{
+  "mcpServers": {
+    "n8n": {
+      "command": "docker-compose",
+      "args": [
+        "-f", "/path/to/n8n-mcp/docker-compose.yml",
+        "run", "--rm", "n8n-mcp"
+      ]
     }
   }
 }
 ```
 
 ### Other MCP Clients
+The server implements the standard MCP protocol and works with:
+- **Cursor IDE**: Full MCP support for code assistance
+- **Windsurf**: Integrated workflow management
+- **n8n Native MCP Nodes**: n8n 1.88.0+ includes built-in MCP Server Trigger and MCP Client Tool nodes
+- Any MCP-compatible client
 
-The server works with any MCP-compatible client. Use the built executable or Node.js command with appropriate environment variables.
+### n8n Native MCP Integration
+As of n8n 1.88.0, n8n includes native MCP support:
+- **MCP Server Trigger**: Exposes n8n workflows as MCP tools
+- **MCP Client Tool**: Connects n8n to external MCP servers
 
-## 🎯 Available Tools
+This project complements n8n's native MCP by providing comprehensive API management capabilities.
 
-### Workflow Tools
-- `workflow_list` - List workflows with filtering options
-- `workflow_get` - Get detailed workflow information
-- `workflow_create` - Create new workflows
-- `workflow_update` - Update existing workflows
-- `workflow_delete` - Delete workflows
-- `workflow_activate` - Activate workflows
-- `workflow_deactivate` - Deactivate workflows
-- `workflow_transfer` - Transfer workflows between projects
+## API Limitations
 
-### Execution Tools
-- `execution_list` - List workflow executions
-- `execution_get` - Get detailed execution information
-- `execution_delete` - Delete execution records
+⚠️ **Important**: The n8n API does not support direct workflow execution. Workflows can only be executed through:
+- Webhook triggers
+- Schedule triggers
+- Manual execution in the n8n UI
+- External triggers configured in the workflow
 
-### Organization Tools
-- `tag_list` - List all tags
-- `tag_create` - Create new tags
-- `tag_update` - Update tag names
-- `tag_delete` - Delete tags
-- `workflow_tags_get` - Get workflow tags
-- `workflow_tags_update` - Update workflow tags
+This MCP server focuses on workflow management, monitoring, and administration rather than direct execution.
 
-### Variable Tools
-- `variable_list` - List environment variables
-- `variable_create` - Create new variables
-- `variable_update` - Update variables
-- `variable_delete` - Delete variables
+## Development
 
-### Project Tools (Enterprise)
-- `project_list` - List projects
-- `project_create` - Create projects
-- `project_update` - Update projects
-- `project_delete` - Delete projects
-
-### Credential Tools
-- `credential_create` - Create credentials
-- `credential_delete` - Delete credentials
-- `credential_schema_get` - Get credential schemas
-- `credential_transfer` - Transfer credentials
-
-### Security Tools
-- `audit_generate` - Generate security audit reports
-
-## 💡 Usage Examples
-
-### List Active Workflows
+### Project Structure
 ```
-Use the workflow_list tool to show me all active workflows
+n8n-mcp/
+├── src/
+│   ├── server.ts              # Main MCP server implementation
+│   ├── n8n-client.ts          # n8n API client
+│   ├── utils/
+│   │   └── validation.ts      # Input validation schemas
+│   └── types/                 # TypeScript type definitions
+├── dist/                      # Compiled JavaScript output
+├── package.json
+├── tsconfig.json
+└── README.md
 ```
 
-### Create a Simple Workflow
-```
-Create a new workflow called "API Monitor" with an HTTP Request node that checks https://api.example.com/health every 5 minutes
-```
-
-### Debug Failed Executions
-```
-Show me the last 10 failed executions and help me understand what went wrong
+### Building
+```bash
+npm run build
 ```
 
-### Security Audit
-```
-Generate a comprehensive security audit report for my n8n instance
-```
-
-### Organize Workflows
-```
-Create tags for "production", "development", and "testing", then organize my workflows accordingly
+### Development Mode
+```bash
+npm run dev
 ```
 
-## 🔒 Security Considerations
+### Code Style
+```bash
+npm run lint
+npm run format
+```
 
-### API Key Management
-- Store API keys securely using environment variables
-- Use API keys with minimal required permissions
-- Rotate API keys regularly
-- Never commit API keys to version control
+## Error Handling
 
-### Network Security
-- Use HTTPS for n8n instance communication
-- Consider VPN or private network access
-- Implement proper firewall rules
-- Monitor API access logs
+The server includes comprehensive error handling:
+- API authentication errors
+- Rate limiting protection
+- Network timeout handling
+- Input validation with detailed error messages
+- Graceful degradation for missing permissions
 
-### Access Control
-- Use n8n's built-in user management and permissions
-- Implement project-based access control (Enterprise)
-- Regular security audits using the audit tools
-- Monitor credential usage and access
+## Security Considerations
 
-## 🐛 Troubleshooting
+- API keys are never logged or exposed
+- All inputs are validated before processing
+- Minimum required permissions principle
+- Secure credential handling
+- Audit trail for all operations
+
+## Troubleshooting
 
 ### Common Issues
 
-**Connection Errors**
-```
-Error: Authentication failed. Check your API key.
-```
-- Verify N8N_API_KEY is correct
-- Ensure API key has required permissions
-- Check n8n instance is accessible
+1. **Authentication Failed**
+   - Verify your n8n API key is correct
+   - Check that API access is enabled in n8n settings
+   - Ensure the API key has sufficient permissions
 
-**Permission Errors**
-```
-Error: Insufficient permissions for this operation.
-```
-- Verify API key permissions in n8n
-- Check if operation requires Enterprise features
-- Ensure user has access to target resources
+2. **Connection Timeout**
+   - Verify your n8n instance is accessible
+   - Check network connectivity
+   - Increase `REQUEST_TIMEOUT` if needed
 
-**Network Timeouts**
-```
-Error: Network Error: timeout of 30000ms exceeded
-```
-- Increase REQUEST_TIMEOUT in environment
-- Check network connectivity to n8n instance
-- Verify n8n instance is responding
+3. **Permission Denied**
+   - Some features require n8n Enterprise (projects, user management)
+   - Verify API key has appropriate scopes
 
-### Debug Mode
+4. **Docker Issues**
+   - Ensure Docker Desktop is running
+   - Check that `.env` file exists and contains valid values
+   - Try rebuilding the image: `make build` or `docker-compose build`
+   - View container logs: `make logs` or `docker-compose logs n8n-mcp`
 
-Enable debug logging:
-```bash
-LOG_LEVEL=debug npm start
-```
+5. **Deployment Script Issues**
+   - **Linux/Mac**: Make script executable: `chmod +x deploy.sh`
+   - **Windows**: Enable script execution: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
+   - **Environment validation fails**: Check your `.env` file format and required variables
+   - **Docker not found**: Ensure Docker is installed and in your system PATH
 
-### Health Check
-
-Test your configuration:
-```bash
-# Test API connectivity
-curl -H "X-N8N-API-KEY: your-api-key" https://your-n8n-instance.com/api/v1/workflows
-```
-
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -271,54 +527,17 @@ curl -H "X-N8N-API-KEY: your-api-key" https://your-n8n-instance.com/api/v1/workf
 4. Add tests if applicable
 5. Submit a pull request
 
-## 📄 License
+## License
 
-MIT License - see LICENSE file for details
+MIT License - see LICENSE file for details.
 
-## 🆘 Support
+## Support
 
-- **Issues**: Report bugs and feature requests via GitHub Issues
-- **Documentation**: Check the technical guide for implementation details
-- **n8n Community**: Join the n8n community for workflow-related questions
+For issues and questions:
+1. Check the troubleshooting section
+2. Review n8n API documentation
+3. Open an issue on the repository
 
-## 🔄 API Compatibility
+---
 
-This MCP server is compatible with:
-- **n8n API Version**: 1.1.1+
-- **MCP Protocol**: 1.0.0+
-- **Node.js**: 18.0.0+
-
-## 📊 Monitoring
-
-The server provides comprehensive logging and error handling:
-- Request/response logging
-- Error tracking with context
-- Performance monitoring
-- API rate limit handling
-
-## 🚀 Advanced Usage
-
-### Custom Workflow Templates
-Create reusable workflow templates by combining multiple tools:
-
-```
-Create a monitoring workflow template that:
-1. Creates a new workflow with HTTP Request and Slack nodes
-2. Sets up error handling
-3. Configures appropriate tags
-4. Activates the workflow
-```
-
-### Batch Operations
-Perform bulk operations across multiple workflows:
-
-```
-Find all workflows tagged "legacy" and update them to use the new API endpoint
-```
-
-### Automated Maintenance
-Use the audit tools for regular maintenance:
-
-```
-Generate a weekly security audit and identify any unused credentials or abandoned workflows
-``` 
+**Note**: This server requires a self-hosted n8n instance with API access. n8n Cloud instances may have different API capabilities and limitations. 

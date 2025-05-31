@@ -98,6 +98,65 @@ export interface N8nProject {
   type?: string;
 }
 
+// User management interfaces (Enterprise feature)
+export interface N8nUser {
+  id?: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  isPending?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  role?: string;
+}
+
+export interface N8nUserCreateRequest {
+  email: string;
+  role: 'global:admin' | 'global:member';
+}
+
+export interface N8nUserCreateResponse {
+  user: {
+    id: string;
+    email: string;
+    inviteAcceptUrl: string;
+    emailSent: boolean;
+  };
+  error?: string;
+}
+
+// Source control interfaces
+export interface N8nSourceControlPullRequest {
+  force?: boolean;
+  variables?: Record<string, string>;
+}
+
+export interface N8nImportResult {
+  variables?: {
+    added: string[];
+    changed: string[];
+  };
+  credentials?: Array<{
+    id: string;
+    name: string;
+    type: string;
+  }>;
+  workflows?: Array<{
+    id: string;
+    name: string;
+  }>;
+  tags?: {
+    tags: Array<{
+      id: string;
+      name: string;
+    }>;
+    mappings: Array<{
+      workflowId: string;
+      tagId: string;
+    }>;
+  };
+}
+
 export interface N8nClientConfig {
   baseUrl: string;
   apiKey: string;
@@ -191,7 +250,7 @@ export class N8nClient {
   }
 
   async updateWorkflow(id: string, workflow: Partial<N8nWorkflow>): Promise<N8nWorkflow> {
-    const response = await this.client.patch(`/workflows/${id}`, workflow);
+    const response = await this.client.put(`/workflows/${id}`, workflow);
     return response.data;
   }
 
@@ -260,6 +319,11 @@ export class N8nClient {
     return response.data;
   }
 
+  async getTag(id: string): Promise<N8nTag> {
+    const response = await this.client.get(`/tags/${id}`);
+    return response.data;
+  }
+
   async createTag(tag: { name: string }): Promise<N8nTag> {
     const response = await this.client.post('/tags', tag);
     return response.data;
@@ -315,6 +379,43 @@ export class N8nClient {
 
   async deleteProject(id: string): Promise<void> {
     await this.client.delete(`/projects/${id}`);
+  }
+
+  // User management operations (Enterprise)
+  async getUsers(params?: {
+    limit?: number;
+    cursor?: string;
+    includeRole?: boolean;
+    projectId?: string;
+  }): Promise<PaginatedResponse<N8nUser>> {
+    const response = await this.client.get('/users', { params });
+    return response.data;
+  }
+
+  async getUser(identifier: string, includeRole?: boolean): Promise<N8nUser> {
+    const response = await this.client.get(`/users/${identifier}`, {
+      params: { includeRole }
+    });
+    return response.data;
+  }
+
+  async createUsers(users: N8nUserCreateRequest[]): Promise<N8nUserCreateResponse[]> {
+    const response = await this.client.post('/users', users);
+    return response.data;
+  }
+
+  async deleteUser(identifier: string): Promise<void> {
+    await this.client.delete(`/users/${identifier}`);
+  }
+
+  async changeUserRole(identifier: string, newRoleName: 'global:admin' | 'global:member'): Promise<void> {
+    await this.client.patch(`/users/${identifier}/role`, { newRoleName });
+  }
+
+  // Source control operations
+  async pullFromSourceControl(pullRequest: N8nSourceControlPullRequest): Promise<N8nImportResult> {
+    const response = await this.client.post('/source-control/pull', pullRequest);
+    return response.data;
   }
 
   // Credential operations

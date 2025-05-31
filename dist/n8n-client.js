@@ -61,7 +61,7 @@ export class N8nClient {
         return response.data;
     }
     async updateWorkflow(id, workflow) {
-        const response = await this.client.patch(`/workflows/${id}`, workflow);
+        const response = await this.client.put(`/workflows/${id}`, workflow);
         return response.data;
     }
     async deleteWorkflow(id) {
@@ -107,6 +107,10 @@ export class N8nClient {
         const response = await this.client.get('/tags', { params });
         return response.data;
     }
+    async getTag(id) {
+        const response = await this.client.get(`/tags/${id}`);
+        return response.data;
+    }
     async createTag(tag) {
         const response = await this.client.post('/tags', tag);
         return response.data;
@@ -146,6 +150,32 @@ export class N8nClient {
     }
     async deleteProject(id) {
         await this.client.delete(`/projects/${id}`);
+    }
+    // User management operations (Enterprise)
+    async getUsers(params) {
+        const response = await this.client.get('/users', { params });
+        return response.data;
+    }
+    async getUser(identifier, includeRole) {
+        const response = await this.client.get(`/users/${identifier}`, {
+            params: { includeRole }
+        });
+        return response.data;
+    }
+    async createUsers(users) {
+        const response = await this.client.post('/users', users);
+        return response.data;
+    }
+    async deleteUser(identifier) {
+        await this.client.delete(`/users/${identifier}`);
+    }
+    async changeUserRole(identifier, newRoleName) {
+        await this.client.patch(`/users/${identifier}/role`, { newRoleName });
+    }
+    // Source control operations
+    async pullFromSourceControl(pullRequest) {
+        const response = await this.client.post('/source-control/pull', pullRequest);
+        return response.data;
     }
     // Credential operations
     async createCredential(credential) {

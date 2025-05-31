@@ -480,6 +480,104 @@ class N8nMcpServer {
               }
             }
           }
+        },
+
+        // User Management Tools (Enterprise)
+        {
+          name: "user_list",
+          description: "List all users in the n8n instance (Enterprise feature). Use this to manage user access and roles.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              limit: { type: "number", minimum: 1, maximum: 250, default: 100 },
+              cursor: { type: "string", description: "Pagination cursor" },
+              includeRole: { type: "boolean", description: "Include user roles in response" },
+              projectId: { type: "string", description: "Filter users by project" }
+            }
+          }
+        },
+        {
+          name: "user_get",
+          description: "Get detailed information about a specific user (Enterprise feature). Use this to view user details and permissions.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              identifier: { type: "string", description: "User ID or email address" },
+              includeRole: { type: "boolean", description: "Include user role in response" }
+            },
+            required: ["identifier"]
+          }
+        },
+        {
+          name: "user_create",
+          description: "Create new users in the n8n instance (Enterprise feature). Use this to invite team members and assign roles.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              users: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    email: { type: "string", format: "email", description: "User email address" },
+                    role: { type: "string", enum: ["global:admin", "global:member"], description: "User role" }
+                  },
+                  required: ["email"]
+                },
+                description: "Array of users to create"
+              }
+            },
+            required: ["users"]
+          }
+        },
+        {
+          name: "user_delete",
+          description: "Delete a user from the n8n instance (Enterprise feature). Use this to remove user access.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              identifier: { type: "string", description: "User ID or email address" }
+            },
+            required: ["identifier"]
+          }
+        },
+        {
+          name: "user_role_change",
+          description: "Change a user's global role (Enterprise feature). Use this to promote or demote user permissions.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              identifier: { type: "string", description: "User ID or email address" },
+              newRoleName: { type: "string", enum: ["global:admin", "global:member"], description: "New role for the user" }
+            },
+            required: ["identifier", "newRoleName"]
+          }
+        },
+
+        // Source Control Tools
+        {
+          name: "source_control_pull",
+          description: "Pull changes from the connected source control repository. Use this to sync workflows and configurations from your Git repository.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              force: { type: "boolean", description: "Force pull even if there are conflicts" },
+              variables: { type: "object", description: "Environment variables to set during pull", additionalProperties: { type: "string" } }
+            }
+          }
+        },
+
+        // Individual Tag Operation
+        {
+          name: "tag_get",
+          description: "Get detailed information about a specific tag. Use this to view tag details and metadata.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              id: { type: "string", description: "Tag ID" }
+            },
+            required: ["id"]
+          }
         }
       ]
     }));
@@ -562,6 +660,26 @@ class N8nMcpServer {
           // Audit Tools
           case "audit_generate":
             return await this.handleAuditGenerate(args);
+
+          // User Management Tools
+          case "user_list":
+            return await this.handleUserList(args);
+          case "user_get":
+            return await this.handleUserGet(args);
+          case "user_create":
+            return await this.handleUserCreate(args);
+          case "user_delete":
+            return await this.handleUserDelete(args);
+          case "user_role_change":
+            return await this.handleUserRoleChange(args);
+
+          // Source Control Tools
+          case "source_control_pull":
+            return await this.handleSourceControlPull(args);
+
+          // Additional Tag Tool
+          case "tag_get":
+            return await this.handleTagGet(args);
 
           default:
             return createErrorResponse(`Unknown tool: ${name}`);
@@ -1021,6 +1139,170 @@ class N8nMcpServer {
     });
     
     return createSuccessResponse('Security audit completed', reportSummary);
+  }
+
+  // User Management Tool Handlers (Enterprise)
+  private async handleUserList(args: unknown) {
+    const params = validateAndTransform(
+      z.object({
+        limit: z.number().min(1).max(250).default(100).optional(),
+        cursor: z.string().optional(),
+        includeRole: z.boolean().optional(),
+        projectId: z.string().optional()
+      }), 
+      args
+    );
+    
+    const result = await this.n8nClient.getUsers(params);
+    
+    const userSummary = result.data.map((user) => 
+      `• **${user.email}** (ID: ${user.id})\n` +
+      `  Name: ${user.firstName || ''} ${user.lastName || ''}`.trim() + '\n' +
+      `  Role: ${user.role || 'N/A'}\n` +
+      `  Status: ${user.isPending ? 'Pending' : 'Active'}\n` +
+      `  Created: ${user.createdAt ? new Date(user.createdAt).toLocaleString() : 'Unknown'}`
+    ).join('\n\n');
+
+    return createSuccessResponse(
+      `Found ${result.data.length} users`,
+      userSummary + (result.nextCursor ? `\n\n📄 Next cursor: ${result.nextCursor}` : '')
+    );
+  }
+
+  private async handleUserGet(args: unknown) {
+    const params = validateAndTransform(
+      z.object({ 
+        identifier: z.string(), 
+        includeRole: z.boolean().optional() 
+      }), 
+      args
+    );
+    
+    const user = await this.n8nClient.getUser(params.identifier, params.includeRole);
+    
+    const userInfo = 
+      `**User: ${user.email}**\n` +
+      `ID: ${user.id}\n` +
+      `Name: ${user.firstName || ''} ${user.lastName || ''}`.trim() + '\n' +
+      `Role: ${user.role || 'N/A'}\n` +
+      `Status: ${user.isPending ? 'Pending Invitation' : 'Active'}\n` +
+      `Created: ${user.createdAt ? new Date(user.createdAt).toLocaleString() : 'Unknown'}\n` +
+      `Updated: ${user.updatedAt ? new Date(user.updatedAt).toLocaleString() : 'Unknown'}`;
+
+    return createSuccessResponse('User details retrieved', userInfo);
+  }
+
+  private async handleUserCreate(args: unknown) {
+    const params = validateAndTransform(
+      z.object({
+        users: z.array(z.object({
+          email: z.string().email(),
+          role: z.enum(['global:admin', 'global:member']).optional()
+        }))
+      }), 
+      args
+    );
+    
+    const results = await this.n8nClient.createUsers(params.users as any);
+    
+    const resultSummary = results.map((result) => {
+      if (result.error) {
+        return `❌ ${result.user?.email || 'Unknown'}: ${result.error}`;
+      } else {
+        return `✅ ${result.user.email}: Invited successfully (ID: ${result.user.id})`;
+      }
+    }).join('\n');
+
+    return createSuccessResponse(`Created ${params.users.length} user invitation(s)`, resultSummary);
+  }
+
+  private async handleUserDelete(args: unknown) {
+    const params = validateAndTransform(
+      z.object({ identifier: z.string() }), 
+      args
+    );
+    
+    await this.n8nClient.deleteUser(params.identifier);
+    
+    return createSuccessResponse(`User ${params.identifier} deleted successfully`);
+  }
+
+  private async handleUserRoleChange(args: unknown) {
+    const params = validateAndTransform(
+      z.object({ 
+        identifier: z.string(), 
+        newRoleName: z.enum(['global:admin', 'global:member']) 
+      }), 
+      args
+    );
+    
+    await this.n8nClient.changeUserRole(params.identifier, params.newRoleName);
+    
+    return createSuccessResponse(`User ${params.identifier} role changed to ${params.newRoleName} successfully`);
+  }
+
+  // Source Control Tool Handlers
+  private async handleSourceControlPull(args: unknown) {
+    const params = validateAndTransform(
+      z.object({
+        force: z.boolean().optional(),
+        variables: z.record(z.string()).optional()
+      }), 
+      args
+    );
+    
+    const result = await this.n8nClient.pullFromSourceControl(params);
+    
+    let resultSummary = '**🔄 Source Control Pull Results:**\n\n';
+    
+    if (result.workflows && result.workflows.length > 0) {
+      resultSummary += `**Workflows (${result.workflows.length}):**\n`;
+      result.workflows.forEach(w => {
+        resultSummary += `  • ${w.name} (${w.id})\n`;
+      });
+      resultSummary += '\n';
+    }
+    
+    if (result.credentials && result.credentials.length > 0) {
+      resultSummary += `**Credentials (${result.credentials.length}):**\n`;
+      result.credentials.forEach(c => {
+        resultSummary += `  • ${c.name} (${c.type})\n`;
+      });
+      resultSummary += '\n';
+    }
+    
+    if (result.variables) {
+      const { added, changed } = result.variables;
+      if (added?.length || changed?.length) {
+        resultSummary += `**Variables:**\n`;
+        if (added?.length) resultSummary += `  Added: ${added.join(', ')}\n`;
+        if (changed?.length) resultSummary += `  Changed: ${changed.join(', ')}\n`;
+        resultSummary += '\n';
+      }
+    }
+    
+    if (result.tags?.tags?.length) {
+      resultSummary += `**Tags (${result.tags.tags.length}):**\n`;
+      result.tags.tags.forEach(t => {
+        resultSummary += `  • ${t.name} (${t.id})\n`;
+      });
+    }
+    
+    return createSuccessResponse('Source control pull completed', resultSummary);
+  }
+
+  // Additional Tag Tool Handler
+  private async handleTagGet(args: unknown) {
+    const params = validateAndTransform(z.object({ id: z.string() }), args);
+    const tag = await this.n8nClient.getTag(params.id);
+    
+    const tagInfo = 
+      `**Tag: ${tag.name}**\n` +
+      `ID: ${tag.id}\n` +
+      `Created: ${tag.createdAt ? new Date(tag.createdAt).toLocaleString() : 'Unknown'}\n` +
+      `Updated: ${tag.updatedAt ? new Date(tag.updatedAt).toLocaleString() : 'Unknown'}`;
+
+    return createSuccessResponse('Tag details retrieved', tagInfo);
   }
 
   async start() {
