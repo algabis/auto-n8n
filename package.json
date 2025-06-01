@@ -1,7 +1,7 @@
 {
-  "name": "n8n-mcp",
+  "name": "auto-n8n",
   "version": "1.0.0",
-  "description": "Model Context Protocol server for n8n workflow automation",
+  "description": "Model Context Protocol server for automated n8n workflow management",
   "main": "dist/server.js",
   "type": "module",
   "scripts": {
@@ -18,6 +18,7 @@
     "start:prod": "npm run build:alt && npm run start"
   },
   "keywords": [
+    "auto-n8n",
     "n8n",
     "mcp",
     "model-context-protocol",
@@ -29,7 +30,7 @@
     "cursor",
     "windsurf"
   ],
-  "author": "n8n MCP Server",
+  "author": "Auto-n8n Team",
   "license": "AGPL-3.0",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
@@ -53,10 +54,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/n8n-mcp.git"
+    "url": "https://github.com/your-org/auto-n8n.git"
   },
   "bugs": {
-    "url": "https://github.com/your-org/n8n-mcp/issues"
+    "url": "https://github.com/your-org/auto-n8n/issues"
   },
-  "homepage": "https://github.com/your-org/n8n-mcp#readme"
+  "homepage": "https://github.com/your-org/auto-n8n#readme"
 }

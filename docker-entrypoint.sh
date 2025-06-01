@@ -8,7 +8,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}🐳 Starting n8n MCP Server Container...${NC}"
+echo -e "${BLUE}🐳 Starting Auto-n8n Container...${NC}"
 
 # Function to log with timestamp
 log() {
@@ -84,7 +84,7 @@ if command -v curl &> /dev/null; then
     fi
 fi
 
-log "${GREEN}🚀 Starting n8n MCP Server...${NC}"
+log "${GREEN}🚀 Starting Auto-n8n...${NC}"
 
 # Execute the main command
 exec "$@" 

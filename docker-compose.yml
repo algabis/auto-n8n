@@ -1,13 +1,13 @@
 version: '3.8'
 
 services:
-  n8n-mcp:
+  auto-n8n:
     build:
       context: .
       dockerfile: Dockerfile
       target: runtime
-    image: n8n-mcp:latest
-    container_name: n8n-mcp-server
+    image: auto-n8n:latest
+    container_name: auto-n8n-server
     restart: unless-stopped
     
     # Environment variables (override with your .env file)
@@ -32,7 +32,7 @@ services:
     
     # Health check
     healthcheck:
-      test: ["CMD", "node", "-e", "console.log('MCP Server is healthy')"]
+      test: ["CMD", "node", "-e", "console.log('Auto-n8n Server is healthy')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -50,11 +50,11 @@ services:
     
     # Network (if you need to connect to other containers)
     # networks:
-    #   - n8n-network
+    #   - auto-n8n-network
 
 # Optional: Define networks
 # networks:
-#   n8n-network:
+#   auto-n8n-network:
 #     driver: bridge
 
 # Optional: Define volumes for persistence

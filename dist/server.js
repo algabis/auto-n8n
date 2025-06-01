@@ -307,8 +307,8 @@ class N8nMcpServer {
     n8nClient;
     constructor() {
         this.server = new Server({
-            name: "n8n-workflow-manager",
-            description: "MCP server for comprehensive n8n workflow automation, debugging, and management",
+            name: "auto-n8n-workflow-manager",
+            description: "Auto-n8n MCP server for comprehensive n8n workflow automation, debugging, and management",
             version: "1.0.0"
         }, {
             capabilities: {
@@ -1466,7 +1466,7 @@ You can also use node_types_list to browse nodes by category.`
     async start() {
         const transport = new StdioServerTransport();
         await this.server.connect(transport);
-        console.error("🚀 n8n MCP Server started successfully");
+        console.error("🚀 Auto-n8n MCP Server started successfully");
     }
 }
 // Start the server

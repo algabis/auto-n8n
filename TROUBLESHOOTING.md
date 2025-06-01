@@ -1,4 +1,4 @@
-# n8n MCP Server Troubleshooting Guide
+# Auto-n8n Troubleshooting Guide
 
 ## Docker Build Issues
 
@@ -306,9 +306,9 @@ Update your `~/.cursor/mcp.json` or `C:\Users\<username>\.cursor\mcp.json`:
 ```json
 {
   "mcpServers": {
-    "n8n-mcp": {
+    "auto-n8n": {
       "command": "node",
-      "args": ["D:\\projects\\n8n-mcp\\dist\\server.js"],
+      "args": ["D:\\projects\\auto-n8n\\dist\\server.js"],
       "env": {
         "N8N_BASE_URL": "https://your-n8n-instance.com",
         "N8N_API_KEY": "your-api-key-here"
@@ -331,11 +331,11 @@ Update your `~/.cursor/mcp.json` or `C:\Users\<username>\.cursor\mcp.json`:
 #### 3. Test Server Manually
 Before configuring MCP client, verify server works:
 ```bash
-cd /path/to/n8n-mcp
+cd /path/to/auto-n8n
 N8N_BASE_URL="https://your-instance.com" N8N_API_KEY="your-key" node dist/server.js
 ```
 
-Should output: `🚀 n8n MCP Server started successfully`
+Should output: `🚀 Auto-n8n MCP Server started successfully`
 
 #### 4. Check Cursor Logs
 - Open Cursor Command Palette (Ctrl+Shift+P)
@@ -368,7 +368,7 @@ After any mcp.json changes:
    ```json
    {
      "mcpServers": {
-       "n8n-mcp": {
+       "auto-n8n": {
          "command": "node",
          "args": ["/absolute/path/to/dist/server.js"],
          "env": {
@@ -384,10 +384,10 @@ After any mcp.json changes:
    ```json
    {
      "mcpServers": {
-       "n8n-mcp": {
+       "auto-n8n": {
          "command": "node",
          "args": ["-r", "dotenv/config", "/absolute/path/to/dist/server.js"],
-         "cwd": "/absolute/path/to/n8n-mcp"
+         "cwd": "/absolute/path/to/auto-n8n"
        }
      }
    }
@@ -414,7 +414,7 @@ After any mcp.json changes:
 ```json
 {
   "command": "node",
-  "args": ["/absolute/path/to/project/dist/server.js"],
+         "args": ["/absolute/path/to/auto-n8n/dist/server.js"],
   "env": {
     "N8N_BASE_URL": "...",
     "N8N_API_KEY": "..."

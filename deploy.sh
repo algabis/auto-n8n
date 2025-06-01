@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# n8n MCP Server Deployment Script
+# Auto-n8n Deployment Script
 set -e
 
 # Colors for output
@@ -11,8 +11,8 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Script configuration
-PROJECT_NAME="n8n-mcp"
-IMAGE_NAME="n8n-mcp:latest"
+PROJECT_NAME="auto-n8n"
+IMAGE_NAME="auto-n8n:latest"
 
 # Function to print colored output
 print_status() {
@@ -66,7 +66,7 @@ check_env_file() {
         echo ""
         echo "Please create a .env file with the following content:"
         echo ""
-        echo "# n8n API Configuration (REQUIRED)"
+        echo "# Auto-n8n API Configuration (REQUIRED)"
         echo "N8N_BASE_URL=https://your-n8n-instance.com"
         echo "N8N_API_KEY=your-api-key-here"
         echo ""
@@ -125,7 +125,7 @@ run_container() {
         echo "Container status:"
         docker-compose ps
         echo ""
-        echo "To view logs: docker-compose logs -f n8n-mcp"
+        echo "To view logs: docker-compose logs -f auto-n8n"
         echo "To stop: docker-compose down"
     else
         print_error "Failed to start container"
@@ -136,7 +136,7 @@ run_container() {
 # Function to show logs
 show_logs() {
     print_status "Showing container logs..."
-    docker-compose logs -f n8n-mcp
+    docker-compose logs -f auto-n8n
 }
 
 # Function to stop the container
@@ -160,7 +160,7 @@ show_status() {
 # Function to get shell access
 shell_access() {
     print_status "Opening shell in container..."
-    docker-compose exec n8n-mcp /bin/sh
+    docker-compose exec auto-n8n /bin/sh
 }
 
 # Function to clean up
@@ -176,8 +176,8 @@ cleanup() {
 
 # Function to show help
 show_help() {
-    echo "n8n MCP Server Deployment Script"
-    echo "================================"
+    echo "Auto-n8n Deployment Script"
+    echo "=========================="
     echo ""
     echo "Usage: ./deploy.sh [COMMAND]"
     echo ""
@@ -202,7 +202,7 @@ show_help() {
 # Main script logic
 main() {
     echo ""
-    print_status "🐳 n8n MCP Server Deployment Script"
+    print_status "🐳 Auto-n8n Deployment Script"
     echo ""
 
     # Parse command line arguments

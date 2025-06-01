@@ -4,7 +4,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-console.log('🔨 Building n8n MCP Server...');
+console.log('🔨 Building Auto-n8n...');
 
 // Ensure dist directory exists
 const distDir = path.join(__dirname, 'dist');
@@ -43,10 +43,10 @@ try {
 // Create a simple JavaScript version of the server for immediate use
 const serverJs = `#!/usr/bin/env node
 
-// Simple JavaScript version of the n8n MCP Server
+// Simple JavaScript version of Auto-n8n
 // This is a fallback version that can be used without TypeScript compilation
 
-console.log('🚀 Starting n8n MCP Server (JavaScript version)...');
+console.log('🚀 Starting Auto-n8n (JavaScript version)...');
 console.log('⚠️  For full functionality, please run: npm run build && npm start');
 
 // Check for required environment variables

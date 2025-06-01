@@ -1,4 +1,4 @@
-# n8n MCP Server Deployment Script for Windows
+# Auto-n8n Deployment Script for Windows
 param(
     [Parameter(Position=0)]
     [ValidateSet("setup", "build", "run", "stop", "restart", "logs", "status", "shell", "clean", "help")]
@@ -6,8 +6,8 @@ param(
 )
 
 function Show-Help {
-    Write-Host "n8n MCP Server Deployment Script for Windows" -ForegroundColor Blue
-    Write-Host "=============================================" -ForegroundColor Blue
+    Write-Host "Auto-n8n Deployment Script for Windows" -ForegroundColor Blue
+    Write-Host "=======================================" -ForegroundColor Blue
     Write-Host ""
     Write-Host "Usage: .\deploy.ps1 [COMMAND]"
     Write-Host ""
@@ -48,7 +48,7 @@ function Test-DockerInstallation {
 # Main switch
 switch ($Command) {
     "setup" {
-        Write-Host "🚀 Setting up n8n MCP Server..." -ForegroundColor Blue
+        Write-Host "🚀 Setting up Auto-n8n..." -ForegroundColor Blue
         Test-DockerInstallation
         if (Test-Path ".env") {
             docker-compose up --build -d
@@ -59,7 +59,7 @@ switch ($Command) {
     }
     "build" {
         Test-DockerInstallation
-        docker build -t n8n-mcp:latest .
+        docker build -t auto-n8n:latest .
     }
     "run" {
         Test-DockerInstallation
@@ -72,17 +72,17 @@ switch ($Command) {
         docker-compose restart
     }
     "logs" {
-        docker-compose logs -f n8n-mcp
+        docker-compose logs -f auto-n8n
     }
     "status" {
         docker-compose ps
     }
     "shell" {
-        docker-compose exec n8n-mcp /bin/sh
+        docker-compose exec auto-n8n /bin/sh
     }
     "clean" {
         docker-compose down --volumes --remove-orphans
-        docker image rm n8n-mcp:latest 2>$null
+        docker image rm auto-n8n:latest 2>$null
         docker system prune -f
     }
     default {

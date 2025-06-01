@@ -1,4 +1,4 @@
-# Multi-stage build for n8n MCP Server
+# Multi-stage build for Auto-n8n
 FROM node:20-alpine AS builder
 
 # Set working directory
@@ -65,6 +65,6 @@ ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "dist/server.js"]
 
 # Labels for metadata
-LABEL maintainer="n8n MCP Server Team"
+LABEL maintainer="Auto-n8n Team"
 LABEL description="Model Context Protocol server for n8n workflow automation"
 LABEL version="1.0.0" 

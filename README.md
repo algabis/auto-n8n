@@ -1,6 +1,6 @@
-# n8n MCP Server
+# Auto-n8n
 
-A comprehensive Model Context Protocol (MCP) server for n8n workflow automation. This server enables AI assistants to interact with self-hosted n8n instances through a standardized protocol, providing tools for workflow management, execution monitoring, and system administration.
+A comprehensive Model Context Protocol (MCP) server for automated n8n workflow management. This server enables AI assistants to interact with self-hosted n8n instances through a standardized protocol, providing tools for workflow management, execution monitoring, and system administration.
 
 ## Features
 
@@ -54,8 +54,8 @@ A comprehensive Model Context Protocol (MCP) server for n8n workflow automation.
 ### Quick Start
 1. **Clone the repository:**
 ```bash
-git clone https://github.com/algabis/n8n-mcp
-cd n8n-mcp
+git clone https://github.com/algabis/auto-n8n
+cd auto-n8n
 ```
 
 2. **Configure environment variables:**
@@ -178,11 +178,11 @@ chmod +x deploy.sh
 #### Method 2: Direct Docker Run
 ```bash
 # Build and run manually
-docker build -t n8n-mcp .
-docker run -d --name n8n-mcp-server \
+docker build -t auto-n8n .
+docker run -d --name auto-n8n-server \
   --env-file .env \
   --restart unless-stopped \
-  n8n-mcp:latest
+  auto-n8n:latest
 ```
 
 #### Method 3: Using Make (Linux/Mac)
@@ -204,8 +204,8 @@ make clean     # Cleanup everything
 
 1. **Clone and install dependencies:**
 ```bash
-git clone https://github.com/algabis/n8n-mcp
-cd n8n-mcp
+git clone https://github.com/algabis/auto-n8n
+cd auto-n8n
 npm install
 ```
 
@@ -416,9 +416,9 @@ Generate comprehensive security audit reports.
 ```json
 {
   "mcpServers": {
-    "n8n-mcp": {
+    "auto-n8n": {
       "command": "node",
-      "args": ["/absolute/path/to/n8n-mcp/dist/server.js"],
+      "args": ["/absolute/path/to/auto-n8n/dist/server.js"],
       "env": {
         "N8N_BASE_URL": "https://your-n8n-instance.com",
         "N8N_API_KEY": "your-api-key-here"
@@ -432,9 +432,9 @@ Generate comprehensive security audit reports.
 ```json
 {
   "mcpServers": {
-    "n8n-mcp": {
+    "auto-n8n": {
       "command": "node",
-      "args": ["D:\\projects\\n8n-mcp\\dist\\server.js"],
+      "args": ["D:\\projects\\auto-n8n\\dist\\server.js"],
       "env": {
         "N8N_BASE_URL": "https://your-n8n-instance.com",
         "N8N_API_KEY": "your-api-key-here"
@@ -448,9 +448,9 @@ Generate comprehensive security audit reports.
 ```json
 {
   "mcpServers": {
-    "n8n-mcp": {
+    "auto-n8n": {
       "command": "node",
-      "args": ["/home/user/n8n-mcp/dist/server.js"],
+      "args": ["/home/user/auto-n8n/dist/server.js"],
       "env": {
         "N8N_BASE_URL": "https://your-n8n-instance.com",
         "N8N_API_KEY": "your-api-key-here"
@@ -464,12 +464,12 @@ Generate comprehensive security audit reports.
 ```json
 {
   "mcpServers": {
-    "n8n": {
+    "auto-n8n": {
       "command": "docker",
       "args": [
         "run", "--rm", "-i",
         "--env-file", "/path/to/your/.env",
-        "n8n-mcp:latest"
+        "auto-n8n:latest"
       ]
     }
   }
@@ -480,11 +480,11 @@ Generate comprehensive security audit reports.
 ```json
 {
   "mcpServers": {
-    "n8n": {
+    "auto-n8n": {
       "command": "docker-compose",
       "args": [
-        "-f", "/path/to/n8n-mcp/docker-compose.yml",
-        "run", "--rm", "n8n-mcp"
+        "-f", "/path/to/auto-n8n/docker-compose.yml",
+        "run", "--rm", "auto-n8n"
       ]
     }
   }
@@ -498,9 +498,9 @@ For Cursor IDE, place the configuration in `~/.cursor/mcp.json` (Linux/Mac) or `
 ```json
 {
   "mcpServers": {
-    "n8n-mcp": {
+    "auto-n8n": {
       "command": "node",
-      "args": ["/absolute/path/to/n8n-mcp/dist/server.js"],
+      "args": ["/absolute/path/to/auto-n8n/dist/server.js"],
       "env": {
         "N8N_BASE_URL": "https://your-n8n-instance.com",
         "N8N_API_KEY": "your-api-key-here"
@@ -543,7 +543,7 @@ This MCP server focuses on workflow management, monitoring, and administration r
 
 ### Project Structure
 ```
-n8n-mcp/
+auto-n8n/
 ├── src/
 │   ├── server.ts              # Main MCP server implementation
 │   ├── n8n-client.ts          # n8n API client
@@ -616,7 +616,7 @@ The server includes comprehensive error handling:
    - Ensure Docker Desktop is running
    - Check that `.env` file exists and contains valid values
    - Try rebuilding the image: `make build` or `docker-compose build`
-   - View container logs: `make logs` or `docker-compose logs n8n-mcp`
+   - View container logs: `make logs` or `docker-compose logs auto-n8n`
 
 5. **Deployment Script Issues**
    - **Linux/Mac**: Make script executable: `chmod +x deploy.sh`

@@ -1,6 +1,6 @@
-# n8n MCP Server - Quick Start Guide
+# Auto-n8n - Quick Start Guide
 
-Get your n8n MCP server running in 5 minutes! 🚀
+Get your Auto-n8n MCP server running in 5 minutes! 🚀
 
 ## 📋 Prerequisites
 
@@ -14,8 +14,8 @@ Get your n8n MCP server running in 5 minutes! 🚀
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/your-org/n8n-mcp
-cd n8n-mcp
+git clone https://github.com/your-org/auto-n8n
+cd auto-n8n
 npm install
 
 # 2. Configure environment
@@ -31,8 +31,8 @@ npm start
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/your-org/n8n-mcp
-cd n8n-mcp
+git clone https://github.com/your-org/auto-n8n
+cd auto-n8n
 
 # 2. Configure environment
 cp env.example .env
@@ -81,9 +81,9 @@ N8N_BASE_URL=https://your-n8n-instance.com
 ```json
 {
   "mcpServers": {
-    "n8n-mcp": {
+    "auto-n8n": {
       "command": "node",
-      "args": ["D:\\projects\\n8n-mcp\\dist\\server.js"],
+      "args": ["D:\\projects\\auto-n8n\\dist\\server.js"],
       "env": {
         "N8N_BASE_URL": "https://your-n8n-instance.com",
         "N8N_API_KEY": "your-api-key-here"
@@ -104,9 +104,9 @@ N8N_BASE_URL=https://your-n8n-instance.com
 ```json
 {
   "mcpServers": {
-    "n8n-mcp": {
+    "auto-n8n": {
       "command": "node",
-      "args": ["/absolute/path/to/n8n-mcp/dist/server.js"],
+      "args": ["/absolute/path/to/auto-n8n/dist/server.js"],
       "env": {
         "N8N_BASE_URL": "https://your-n8n-instance.com",
         "N8N_API_KEY": "your-api-key-here"
@@ -121,7 +121,7 @@ N8N_BASE_URL=https://your-n8n-instance.com
 ### 1. **Test Server Manually**
 
 ```bash
-# Should output: 🚀 n8n MCP Server started successfully
+# Should output: 🚀 Auto-n8n MCP Server started successfully
 npm start
 ```
 
