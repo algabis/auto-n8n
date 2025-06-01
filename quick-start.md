@@ -165,11 +165,52 @@ In your MCP client (Cursor/Claude), try:
 - Project management (Enterprise feature)
 - Advanced user management (Enterprise feature)
 
+## 🎯 Key Features
+
+Now that your MCP server is running, you have access to powerful n8n automation tools:
+
+### 🔍 **Smart Workflow Search**
+Search through real working workflow examples by node types or keywords:
+- Find workflows using specific nodes (e.g., OpenAI, Slack, webhooks)
+- Discover implementation patterns and best practices
+- Get relevant examples without overwhelming your context
+
+### 🧠 **Node Intelligence**
+- Complete information about all n8n built-in nodes
+- Parameter details and usage examples
+- Node categories and descriptions
+
+### ⚙️ **Workflow Management**
+- Create, update, and manage workflows programmatically
+- Monitor executions and debug issues
+- Organize with tags and projects
+
+## 🚀 Try These Examples
+
+In your MCP client (Cursor/Claude), try these commands:
+
+1. **Find AI-related workflows:**
+   - Tool: `workflow_examples_search`
+   - Parameters: `{"keywords": ["ai", "agent"], "maxExamples": 1}`
+
+2. **Learn about webhook nodes:**
+   - Tool: `node_type_info`
+   - Parameters: `{"nodeType": "n8n-nodes-base.webhook"}`
+
+3. **Browse all node categories:**
+   - Tool: `node_categories`
+   - Parameters: `{}`
+
+4. **List your workflows:**
+   - Tool: `workflow_list`
+   - Parameters: `{"limit": 5}`
+
 ## 📚 Next Steps
 
 - Read the full [README](README.md) for complete feature list
 - Check [TROUBLESHOOTING](TROUBLESHOOTING.md) for detailed help
 - Browse available tools in your MCP client
+- **Explore the [examples/README.md](examples/README.md)** for workflow examples documentation
 - Create your first workflow using the MCP tools!
 
 ---

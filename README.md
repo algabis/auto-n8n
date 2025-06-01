@@ -9,6 +9,7 @@ A comprehensive Model Context Protocol (MCP) server for n8n workflow automation.
 - Activate/deactivate workflows
 - Transfer workflows between projects (Enterprise)
 - Manage workflow tags and organization
+- **Smart workflow examples search** - Find real working workflows by node types or keywords
 
 ### 📊 Execution Monitoring
 - Monitor workflow executions in real-time
@@ -258,6 +259,42 @@ When using deployment scripts, the following validations are performed:
 - ✅ Container health monitoring
 
 ## Available Tools
+
+### Node Information & Examples
+
+#### `node_types_list`
+List all available built-in n8n node types with categories and descriptions.
+```json
+{
+  "category": "Core",
+  "search": "webhook"
+}
+```
+
+#### `node_type_info`
+Get detailed information about a specific node type including parameters and usage.
+```json
+{
+  "nodeType": "n8n-nodes-base.openai"
+}
+```
+
+#### `workflow_examples_search`
+🆕 **Smart search through real working workflow examples**. Find workflows that use specific nodes or match keywords. Perfect for learning how nodes are actually implemented.
+```json
+{
+  "nodeTypes": ["n8n-nodes-base.openai", "n8n-nodes-base.slack"],
+  "keywords": ["ai", "automation"],
+  "maxExamples": 2,
+  "includeFullWorkflow": false
+}
+```
+
+**Use this when you need to see real implementations of:**
+- Specific n8n nodes in working workflows
+- Similar use cases and patterns
+- Node combinations and configurations
+- Data flow patterns between nodes
 
 ### Workflow Tools
 
@@ -513,9 +550,14 @@ n8n-mcp/
 │   ├── utils/
 │   │   └── validation.ts      # Input validation schemas
 │   └── types/                 # TypeScript type definitions
+├── examples/
+│   ├── workflows/             # Real workflow examples for search
+│   └── README.md              # Workflow examples documentation
 ├── dist/                      # Compiled JavaScript output
 ├── package.json
 ├── tsconfig.json
+├── quick-start.md             # Quick setup guide
+├── TROUBLESHOOTING.md         # Comprehensive troubleshooting
 └── README.md
 ```
 

@@ -192,6 +192,59 @@ N8N_API_KEY=your-api-key-here
 
 2. **Check import paths** in TypeScript files
 
+### Issue: Workflow examples search not finding files
+
+**Symptoms**: `workflow_examples_search` returns "No examples directory found"
+
+**Cause**: Missing examples directory or empty workflow files
+
+**Solutions**:
+1. **Create examples directory**:
+   ```bash
+   mkdir -p examples/workflows
+   ```
+
+2. **Check for workflow files**:
+   ```bash
+   ls -la examples/workflows/
+   ```
+
+3. **Verify JSON files are valid**:
+   ```bash
+   # Test JSON parsing
+   node -e "JSON.parse(require('fs').readFileSync('examples/workflows/filename.json', 'utf8'))"
+   ```
+
+4. **Add example workflows**:
+   - Export workflows from your n8n instance as JSON
+   - Save to `examples/workflows/` with descriptive filenames
+   - Use `.json` extension (case-insensitive)
+
+### Issue: Workflow search returns no matches
+
+**Symptoms**: Search completes but returns 0 matches despite having workflow files
+
+**Cause**: Search criteria too specific or incorrect node type names
+
+**Solutions**:
+1. **Try broader search**:
+   ```json
+   {"keywords": ["ai"], "maxExamples": 5}
+   ```
+
+2. **Search without criteria** (returns all):
+   ```json
+   {"maxExamples": 3}
+   ```
+
+3. **Check node type format**:
+   - Use full node names: `n8n-nodes-base.openai`
+   - Not just: `openai`
+
+4. **Check filename keywords**:
+   - Search looks in filenames and workflow names
+   - Use descriptive filenames like `ai-agent-workflow.json`
+
 ### Issue: n8n API connection failures
 
 **Symptoms**: Network timeouts, connection refused, "Resource not found" errors
@@ -432,4 +485,7 @@ If issues persist:
 | **MCP client closed** | **Use absolute path in mcp.json + env vars** |
 | **Missing npm script** | **Use node command instead of npm** |
 | **Cannot find module** | **Check absolute path in mcp.json args** |
-| **MCP no tools listed** | **Restart MCP client completely** | 
+| **MCP no tools listed** | **Restart MCP client completely** |
+| **Examples not found** | **Create `examples/workflows/` directory** |
+| **Search no matches** | **Try broader keywords or check node names** |
+| **Invalid JSON workflows** | **Validate JSON files with `node -e "JSON.parse(...)"** | 

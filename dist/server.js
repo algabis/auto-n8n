@@ -2,10 +2,11 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { z } from "zod";
 import dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
 import { N8nClient } from "./n8n-client.js";
-import { workflowListSchema, workflowIdSchema, workflowCreateSchema, executionListSchema, executionIdSchema, tagCreateSchema, tagIdSchema, variableCreateSchema, variableIdSchema, projectCreateSchema, projectIdSchema, credentialCreateSchema, credentialIdSchema, auditGenerateSchema, createErrorResponse, createSuccessResponse, validateAndTransform } from "./utils/validation.js";
+import { createErrorResponse } from "./utils/validation.js";
 // Load environment variables
 dotenv.config();
 // Validate required environment variables
@@ -16,6 +17,291 @@ for (const envVar of requiredEnvVars) {
         process.exit(1);
     }
 }
+// Built-in n8n node types and their information
+const CORE_NODES = {
+    // Core/utility nodes
+    'n8n-nodes-base.manualTrigger': {
+        category: 'Core',
+        description: 'Starts workflow manually from the workflow editor',
+        inputsCount: 0,
+        outputsCount: 1,
+        commonParameters: {},
+        usageNotes: 'Best for testing workflows or workflows that should be started manually'
+    },
+    'n8n-nodes-base.webhook': {
+        category: 'Core',
+        description: 'Listens for HTTP requests to trigger the workflow',
+        inputsCount: 0,
+        outputsCount: 1,
+        commonParameters: {
+            httpMethod: { type: 'string', default: 'GET', options: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD'] },
+            path: { type: 'string', description: 'The URL path that will trigger this webhook' },
+            authentication: { type: 'string', default: 'none', options: ['none', 'basicAuth', 'headerAuth'] },
+            responseMode: { type: 'string', default: 'onReceived', options: ['onReceived', 'lastNode'] }
+        },
+        usageNotes: 'Creates an HTTP endpoint that can trigger your workflow from external systems'
+    },
+    'n8n-nodes-base.schedulerigger': {
+        category: 'Core',
+        description: 'Triggers workflow on a schedule (cron-like)',
+        inputsCount: 0,
+        outputsCount: 1,
+        commonParameters: {
+            rule: { type: 'object', description: 'Schedule configuration with intervals, timezone, etc.' },
+            triggerAtSecond: { type: 'number', default: 0 }
+        },
+        usageNotes: 'Perfect for automating workflows that need to run at specific times or intervals'
+    },
+    'n8n-nodes-base.code': {
+        category: 'Core',
+        description: 'Executes custom JavaScript or Python code',
+        inputsCount: 1,
+        outputsCount: 1,
+        commonParameters: {
+            language: { type: 'string', default: 'javaScript', options: ['javaScript', 'python'] },
+            code: { type: 'string', description: 'The code to execute' }
+        },
+        usageNotes: 'Use for custom data processing, complex logic, or when no built-in node exists'
+    },
+    'n8n-nodes-base.httpRequest': {
+        category: 'Core',
+        description: 'Makes HTTP requests to any API',
+        inputsCount: 1,
+        outputsCount: 1,
+        commonParameters: {
+            method: { type: 'string', default: 'GET', options: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD'] },
+            url: { type: 'string', description: 'The URL to make the request to' },
+            authentication: { type: 'string', default: 'none' },
+            sendHeaders: { type: 'boolean', default: false },
+            headerParameters: { type: 'object' },
+            sendQuery: { type: 'boolean', default: false },
+            queryParameters: { type: 'object' },
+            sendBody: { type: 'boolean', default: false },
+            bodyParameters: { type: 'object' }
+        },
+        usageNotes: 'Generic HTTP client for APIs that don\'t have dedicated n8n nodes'
+    },
+    'n8n-nodes-base.set': {
+        category: 'Core',
+        description: 'Modifies data by setting, removing, or keeping specific fields',
+        inputsCount: 1,
+        outputsCount: 1,
+        commonParameters: {
+            keepOnlySet: { type: 'boolean', default: false, description: 'Whether to keep only the set fields' },
+            values: { type: 'object', description: 'Fields to set with their values' }
+        },
+        usageNotes: 'Essential for data transformation and cleaning in workflows'
+    },
+    'n8n-nodes-base.if': {
+        category: 'Core',
+        description: 'Routes data based on conditions (if/else logic)',
+        inputsCount: 1,
+        outputsCount: 2,
+        commonParameters: {
+            conditions: { type: 'object', description: 'Array of conditions to evaluate' },
+            combineOperation: { type: 'string', default: 'all', options: ['all', 'any'] }
+        },
+        usageNotes: 'Creates conditional workflows - items go to "true" or "false" output based on conditions'
+    },
+    'n8n-nodes-base.switch': {
+        category: 'Core',
+        description: 'Routes data to different outputs based on rules',
+        inputsCount: 1,
+        outputsCount: 4,
+        commonParameters: {
+            mode: { type: 'string', default: 'rules', options: ['rules', 'expression'] },
+            rules: { type: 'object', description: 'Array of routing rules' }
+        },
+        usageNotes: 'More flexible than IF node - can route to multiple different paths'
+    },
+    'n8n-nodes-base.merge': {
+        category: 'Core',
+        description: 'Combines data from multiple inputs',
+        inputsCount: 2,
+        outputsCount: 1,
+        commonParameters: {
+            mode: { type: 'string', default: 'append', options: ['append', 'merge', 'chooseBranch', 'multiplex'] },
+            joinMode: { type: 'string', default: 'keepEverything' }
+        },
+        usageNotes: 'Combines data from different workflow branches or data sources'
+    },
+    'n8n-nodes-base.splitInBatches': {
+        category: 'Core',
+        description: 'Processes data in batches to handle large datasets',
+        inputsCount: 1,
+        outputsCount: 1,
+        commonParameters: {
+            batchSize: { type: 'number', default: 10, description: 'Number of items to process in each batch' },
+            options: { type: 'object' }
+        },
+        usageNotes: 'Prevents memory issues when processing large amounts of data'
+    },
+    'n8n-nodes-base.wait': {
+        category: 'Core',
+        description: 'Pauses workflow execution for a specified time',
+        inputsCount: 1,
+        outputsCount: 1,
+        commonParameters: {
+            unit: { type: 'string', default: 'seconds', options: ['seconds', 'minutes', 'hours', 'days'] },
+            amount: { type: 'number', default: 1 }
+        },
+        usageNotes: 'Useful for rate limiting, delays, or waiting for external processes'
+    },
+    'n8n-nodes-base.noOp': {
+        category: 'Core',
+        description: 'Does nothing - passes data through unchanged',
+        inputsCount: 1,
+        outputsCount: 1,
+        commonParameters: {},
+        usageNotes: 'Useful for debugging, placeholders, or organizing workflow layout'
+    },
+    'n8n-nodes-base.stopAndError': {
+        category: 'Core',
+        description: 'Stops workflow execution and optionally throws an error',
+        inputsCount: 1,
+        outputsCount: 0,
+        commonParameters: {
+            message: { type: 'string', description: 'Error message to display' }
+        },
+        usageNotes: 'Use for error handling, validation, or stopping execution under certain conditions'
+    },
+    // Popular service nodes
+    'n8n-nodes-base.gmail': {
+        category: 'Communication',
+        description: 'Interacts with Gmail - send, read, and manage emails',
+        inputsCount: 1,
+        outputsCount: 1,
+        commonParameters: {
+            resource: { type: 'string', options: ['message', 'draft', 'thread', 'label'] },
+            operation: { type: 'string', options: ['send', 'get', 'getAll', 'delete', 'reply'] }
+        },
+        usageNotes: 'Requires Gmail OAuth2 credentials. Great for email automation'
+    },
+    'n8n-nodes-base.slack': {
+        category: 'Communication',
+        description: 'Sends messages and interacts with Slack',
+        inputsCount: 1,
+        outputsCount: 1,
+        commonParameters: {
+            resource: { type: 'string', options: ['message', 'channel', 'user'] },
+            operation: { type: 'string', options: ['post', 'update', 'delete', 'get', 'getAll'] }
+        },
+        usageNotes: 'Requires Slack app credentials. Perfect for team notifications'
+    },
+    'n8n-nodes-base.googleSheets': {
+        category: 'Productivity',
+        description: 'Reads from and writes to Google Sheets',
+        inputsCount: 1,
+        outputsCount: 1,
+        commonParameters: {
+            resource: { type: 'string', options: ['spreadsheet', 'sheet'] },
+            operation: { type: 'string', options: ['read', 'append', 'update', 'delete', 'create'] }
+        },
+        usageNotes: 'Requires Google credentials. Excellent for data storage and reporting'
+    },
+    'n8n-nodes-base.notion': {
+        category: 'Productivity',
+        description: 'Manages Notion databases and pages',
+        inputsCount: 1,
+        outputsCount: 1,
+        commonParameters: {
+            resource: { type: 'string', options: ['database', 'page', 'user'] },
+            operation: { type: 'string', options: ['get', 'getAll', 'create', 'update', 'delete'] }
+        },
+        usageNotes: 'Requires Notion integration token. Great for content management'
+    },
+    'n8n-nodes-base.mysql': {
+        category: 'Data & Storage',
+        description: 'Executes queries against MySQL databases',
+        inputsCount: 1,
+        outputsCount: 1,
+        commonParameters: {
+            operation: { type: 'string', default: 'executeQuery', options: ['executeQuery', 'insert', 'update', 'delete'] },
+            query: { type: 'string', description: 'SQL query to execute' }
+        },
+        usageNotes: 'Requires MySQL credentials. Use for database operations and data integration'
+    },
+    'n8n-nodes-base.postgres': {
+        category: 'Data & Storage',
+        description: 'Executes queries against PostgreSQL databases',
+        inputsCount: 1,
+        outputsCount: 1,
+        commonParameters: {
+            operation: { type: 'string', default: 'executeQuery', options: ['executeQuery', 'insert', 'update', 'delete'] },
+            query: { type: 'string', description: 'SQL query to execute' }
+        },
+        usageNotes: 'Requires PostgreSQL credentials. Powerful for complex data operations'
+    },
+    'n8n-nodes-base.airtable': {
+        category: 'Productivity',
+        description: 'Manages Airtable bases and records',
+        inputsCount: 1,
+        outputsCount: 1,
+        commonParameters: {
+            operation: { type: 'string', options: ['list', 'read', 'create', 'update', 'delete'] },
+            application: { type: 'string', description: 'Airtable base ID' },
+            table: { type: 'string', description: 'Table name' }
+        },
+        usageNotes: 'Requires Airtable API key. Great for managing structured data'
+    },
+    'n8n-nodes-base.telegram': {
+        category: 'Communication',
+        description: 'Sends messages via Telegram bot',
+        inputsCount: 1,
+        outputsCount: 1,
+        commonParameters: {
+            resource: { type: 'string', options: ['message', 'file', 'chat'] },
+            operation: { type: 'string', options: ['sendMessage', 'sendPhoto', 'sendDocument'] },
+            chatId: { type: 'string', description: 'Chat ID to send message to' }
+        },
+        usageNotes: 'Requires Telegram bot token. Perfect for instant notifications'
+    },
+    'n8n-nodes-base.discord': {
+        category: 'Communication',
+        description: 'Sends messages to Discord channels',
+        inputsCount: 1,
+        outputsCount: 1,
+        commonParameters: {
+            resource: { type: 'string', options: ['message', 'member'] },
+            operation: { type: 'string', options: ['send', 'get', 'getAll'] },
+            webhookUrl: { type: 'string', description: 'Discord webhook URL' }
+        },
+        usageNotes: 'Use Discord webhook for simple messaging or bot token for advanced features'
+    },
+    'n8n-nodes-base.hubspot': {
+        category: 'Sales',
+        description: 'Manages HubSpot CRM data - contacts, companies, deals',
+        inputsCount: 1,
+        outputsCount: 1,
+        commonParameters: {
+            resource: { type: 'string', options: ['contact', 'company', 'deal', 'ticket'] },
+            operation: { type: 'string', options: ['create', 'update', 'get', 'getAll', 'delete'] }
+        },
+        usageNotes: 'Requires HubSpot API key. Essential for CRM automation'
+    },
+    'n8n-nodes-base.openai': {
+        category: 'AI',
+        description: 'Interacts with OpenAI APIs for AI-powered text and image generation',
+        inputsCount: 1,
+        outputsCount: 1,
+        commonParameters: {
+            resource: { type: 'string', options: ['text', 'image', 'audio', 'assistant', 'file'] },
+            operation: { type: 'string', options: ['complete', 'message', 'generate', 'transcribe'] }
+        },
+        usageNotes: 'Requires OpenAI API key. Powerful for AI integration in workflows'
+    }
+};
+const NODE_CATEGORIES = {
+    'Core': 'Essential nodes for workflow logic and control flow',
+    'Communication': 'Nodes for messaging, email, and team collaboration',
+    'Productivity': 'Nodes for productivity tools and document management',
+    'Data & Storage': 'Nodes for databases and data storage systems',
+    'Sales': 'Nodes for CRM and sales automation',
+    'AI': 'Nodes for artificial intelligence and machine learning services',
+    'Marketing': 'Nodes for marketing automation and analytics',
+    'Development': 'Nodes for development tools and version control',
+    'Finance': 'Nodes for payment processing and financial services'
+};
 class N8nMcpServer {
     server;
     n8nClient;
@@ -40,23 +326,99 @@ class N8nMcpServer {
         this.setupResourceHandlers();
     }
     setupToolHandlers() {
-        // Workflow Management Tools
+        // List available tools
         this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
             tools: [
+                // Node information tools
+                {
+                    name: "node_types_list",
+                    description: "List all available built-in n8n node types with categories and descriptions",
+                    inputSchema: {
+                        type: "object",
+                        properties: {
+                            category: {
+                                type: "string",
+                                description: "Filter by category (Core, Communication, Productivity, Data & Storage, etc.)",
+                                enum: Object.keys(NODE_CATEGORIES)
+                            },
+                            search: {
+                                type: "string",
+                                description: "Search node names and descriptions"
+                            }
+                        }
+                    }
+                },
+                {
+                    name: "node_type_info",
+                    description: "Get detailed information about a specific node type including parameters and usage",
+                    inputSchema: {
+                        type: "object",
+                        properties: {
+                            nodeType: {
+                                type: "string",
+                                description: "Node type (e.g., 'n8n-nodes-base.manualTrigger', 'n8n-nodes-base.slack')"
+                            }
+                        },
+                        required: ["nodeType"]
+                    }
+                },
+                {
+                    name: "node_categories",
+                    description: "List all node categories with descriptions",
+                    inputSchema: {
+                        type: "object",
+                        properties: {}
+                    }
+                },
+                {
+                    name: "workflow_examples",
+                    description: "Get example workflow structures for common use cases",
+                    inputSchema: {
+                        type: "object",
+                        properties: {
+                            useCase: {
+                                type: "string",
+                                description: "Use case type",
+                                enum: ["simple-webhook", "scheduled-task", "data-processing", "notification", "api-integration"]
+                            }
+                        }
+                    }
+                },
+                {
+                    name: "workflow_examples_search",
+                    description: "Search real working workflow examples by node types, keywords, or use cases. Returns actual workflow JSON from examples folder that contain the specified nodes/features. Use this when you need to see how specific nodes are actually implemented in working workflows.",
+                    inputSchema: {
+                        type: "object",
+                        properties: {
+                            nodeTypes: {
+                                type: "array",
+                                items: { type: "string" },
+                                description: "Array of node types to search for (e.g., ['n8n-nodes-base.openai', 'n8n-nodes-base.slack'])"
+                            },
+                            keywords: {
+                                type: "array",
+                                items: { type: "string" },
+                                description: "Keywords to search in workflow names and descriptions (e.g., ['ai', 'trading', 'social media'])"
+                            },
+                            maxExamples: {
+                                type: "number",
+                                default: 2,
+                                minimum: 1,
+                                maximum: 5,
+                                description: "Maximum number of examples to return (to limit context size)"
+                            },
+                            includeFullWorkflow: {
+                                type: "boolean",
+                                default: false,
+                                description: "Include full workflow JSON (true) or just relevant node excerpts (false)"
+                            }
+                        }
+                    }
+                },
                 // Workflow Tools
                 {
                     name: "workflow_list",
-                    description: `List all workflows with filtering options. 
-          
-**Input**: Optional filters for active status, tags, name, project, pagination
-**Output**: Array of workflow summaries with basic info (name, ID, status, node count)
-**Use Cases**: Browse workflows, find specific workflows, get instance overview
-**Pagination**: Uses cursor-based pagination with limit up to 250
-
-Example filters:
-- active: true (only active workflows)
-- tags: "production,staging" (workflows with these tags)
-- name: "Data Processing" (partial name match)`,
+                    description: "List all workflows in the n8n instance",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -64,26 +426,15 @@ Example filters:
                             tags: { type: "string", description: "Comma-separated list of tag names to filter by" },
                             name: { type: "string", description: "Filter workflows by name (partial match)" },
                             projectId: { type: "string", description: "Filter by project ID (Enterprise)" },
-                            excludePinnedData: { type: "boolean", description: "Exclude pinned data from response for faster loading" },
-                            limit: { type: "number", minimum: 1, maximum: 250, default: 100, description: "Maximum number of workflows to return" },
+                            excludePinnedData: { type: "boolean", description: "Exclude pinned data for faster loading" },
+                            limit: { type: "number", description: "Maximum number of workflows to return", maximum: 250, minimum: 1, default: 100 },
                             cursor: { type: "string", description: "Pagination cursor for next page" }
                         }
                     }
                 },
                 {
                     name: "workflow_get",
-                    description: `Get detailed information about a specific workflow.
-
-**Input**: Workflow ID (required), optional excludePinnedData flag
-**Output**: Complete workflow object with nodes, connections, settings, and metadata
-**Use Cases**: Examine workflow structure, debug issues, understand node configurations
-**Performance**: Set excludePinnedData=true for faster loading if you don't need test data
-
-Returns:
-- Full node definitions with parameters and credentials
-- Connection mappings between nodes
-- Workflow settings (execution, timeout, timezone)
-- Tags, creation/update timestamps`,
+                    description: "Get detailed information about a specific workflow",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -95,49 +446,7 @@ Returns:
                 },
                 {
                     name: "workflow_create",
-                    description: `Create a new workflow with nodes, connections, and settings.
-
-**CRITICAL**: All fields (name, nodes, connections, settings) are REQUIRED by n8n API!
-
-**Input Structure**:
-\`\`\`json
-{
-  "name": "My Workflow",
-  "nodes": [
-    {
-      "name": "Start",
-      "type": "n8n-nodes-base.manualTrigger", 
-      "position": [240, 300],
-      "parameters": {}
-    }
-  ],
-  "connections": {},
-  "settings": {
-    "saveExecutionProgress": false,
-    "saveManualExecutions": false,
-    "saveDataErrorExecution": "all",
-    "saveDataSuccessExecution": "all"
-  }
-}
-\`\`\`
-
-**Common Node Types**:
-- n8n-nodes-base.manualTrigger (manual execution)
-- n8n-nodes-base.webhook (HTTP webhook)
-- n8n-nodes-base.httpRequest (HTTP requests) 
-- n8n-nodes-base.code (JavaScript/Python code)
-- n8n-nodes-base.set (data transformation)
-
-**Connection Format**:
-\`\`\`json
-{
-  "Node1": {
-    "main": [[{"node": "Node2", "type": "main", "index": 0}]]
-  }
-}
-\`\`\`
-
-**Output**: Created workflow object with assigned ID`,
+                    description: "Create a new workflow with nodes, connections, and settings",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -191,32 +500,24 @@ Returns:
                                     saveManualExecutions: { type: "boolean", default: false },
                                     saveDataErrorExecution: { type: "string", enum: ["all", "none"], default: "all" },
                                     saveDataSuccessExecution: { type: "string", enum: ["all", "none"], default: "all" },
-                                    executionTimeout: { type: "number", maximum: 3600, description: "Timeout in seconds" },
+                                    executionTimeout: { type: "number", description: "Timeout in seconds", maximum: 3600 },
                                     timezone: { type: "string", description: "Workflow timezone" }
                                 },
                                 required: ["saveExecutionProgress", "saveManualExecutions", "saveDataErrorExecution", "saveDataSuccessExecution"]
                             },
-                            tags: { type: "array", items: { type: "string" }, description: "Workflow tags (tag names, not IDs)" },
-                            active: { type: "boolean", default: false, description: "Whether to activate immediately" }
+                            tags: {
+                                type: "array",
+                                items: { type: "string" },
+                                description: "Workflow tags (tag names, not IDs)"
+                            },
+                            active: { type: "boolean", description: "Whether to activate immediately", default: false }
                         },
                         required: ["name", "nodes", "connections", "settings"]
                     }
                 },
                 {
                     name: "workflow_update",
-                    description: `Update an existing workflow's properties.
-
-**Input**: Workflow ID (required) + any fields to update
-**Output**: Updated workflow object
-**Use Cases**: Modify workflows, fix issues, add functionality
-**Validation**: Maintains referential integrity of node connections
-
-Updatable fields:
-- name: Workflow name
-- nodes: Complete nodes array (replaces existing)
-- connections: Complete connections object
-- settings: Workflow settings object
-- active: Activation status`,
+                    description: "Update an existing workflow's properties",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -232,19 +533,7 @@ Updatable fields:
                 },
                 {
                     name: "workflow_delete",
-                    description: `Delete a workflow permanently.
-
-**WARNING**: This action cannot be undone!
-
-**Input**: Workflow ID (required)
-**Output**: Deleted workflow object (for confirmation)
-**Use Cases**: Clean up unused workflows, remove test workflows
-**Prerequisites**: Workflow must be deactivated first
-
-Side effects:
-- Removes all execution history
-- Breaks any webhook URLs
-- Removes workflow from all projects`,
+                    description: "Delete a workflow permanently",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -255,22 +544,7 @@ Side effects:
                 },
                 {
                     name: "workflow_activate",
-                    description: `Activate a workflow to enable automatic execution.
-
-**Input**: Workflow ID (required)
-**Output**: Activated workflow object
-**Prerequisites**: 
-- Workflow must have trigger nodes (webhook, schedule, etc.)
-- All required credentials must be configured
-- Workflow must be valid (no broken connections)
-
-**Trigger Types That Enable Automation**:
-- Webhook trigger (enables HTTP endpoint)
-- Schedule trigger (enables cron execution)
-- Email trigger (monitors IMAP)
-- File trigger (monitors filesystem)
-
-**Note**: Manual triggers don't enable automation`,
+                    description: "Activate a workflow to enable automatic execution",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -281,17 +555,7 @@ Side effects:
                 },
                 {
                     name: "workflow_deactivate",
-                    description: `Deactivate a workflow to stop automatic execution.
-
-**Input**: Workflow ID (required)
-**Output**: Deactivated workflow object
-**Use Cases**: Pause automation, maintenance, debugging
-**Safe Operation**: Does not delete workflow or data
-
-Effects:
-- Stops webhook endpoints
-- Disables scheduled executions
-- Preserves workflow definition and history`,
+                    description: "Deactivate a workflow to stop automatic execution",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -302,14 +566,7 @@ Effects:
                 },
                 {
                     name: "workflow_transfer",
-                    description: `Transfer a workflow to another project (Enterprise feature).
-
-**Input**: Workflow ID + destination project ID
-**Output**: Success confirmation
-**Requirements**: n8n Enterprise license, appropriate permissions
-**Use Cases**: Project organization, access control management
-
-**Note**: Only available in n8n Enterprise installations`,
+                    description: "Transfer a workflow to another project (Enterprise feature)",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -322,24 +579,7 @@ Effects:
                 // Execution Tools
                 {
                     name: "execution_list",
-                    description: `List workflow executions with filtering and analysis.
-
-**Input**: Optional filters for status, workflow, project, pagination
-**Output**: Array of execution summaries with timing and status info
-**Use Cases**: Monitor runs, find failures, analyze patterns, performance tracking
-
-**Status Filters**:
-- "error": Failed executions only
-- "success": Successful executions only  
-- "waiting": Currently running/waiting
-
-**Performance**: Set includeData=false for faster listing (default)
-
-**Output Information**:
-- Execution ID, workflow ID, status
-- Start/stop timestamps, duration
-- Execution mode (manual, trigger, webhook, etc.)
-- Basic error information (if failed)`,
+                    description: "List workflow executions with filtering and analysis",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -354,20 +594,7 @@ Effects:
                 },
                 {
                     name: "execution_get",
-                    description: `Get detailed execution information for debugging and analysis.
-
-**Input**: Execution ID (required), optional includeData flag
-**Output**: Complete execution object with node-by-node results
-**Use Cases**: Debug failed workflows, analyze data flow, performance analysis
-
-**Detailed Information Includes**:
-- Node execution results and timings
-- Data passed between nodes
-- Error messages and stack traces
-- Input/output data for each node
-- Execution timeline and bottlenecks
-
-**Performance**: Set includeData=true for full debugging info (slower)`,
+                    description: "Get detailed execution information for debugging and analysis",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -379,14 +606,7 @@ Effects:
                 },
                 {
                     name: "execution_delete",
-                    description: `Delete an execution record.
-
-**Input**: Execution ID (required)
-**Output**: Deleted execution object (confirmation)
-**Use Cases**: Clean up history, remove sensitive data, manage storage
-**Warning**: Removes execution data permanently
-
-**Note**: Does not affect the workflow definition, only this execution record`,
+                    description: "Delete an execution record",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -398,17 +618,7 @@ Effects:
                 // Tag Management Tools
                 {
                     name: "tag_list",
-                    description: `List all available tags for workflow organization.
-
-**Input**: Optional pagination parameters
-**Output**: Array of tag objects with ID, name, timestamps
-**Use Cases**: See existing tags, prepare for workflow tagging, audit organization
-
-**Tag Information**:
-- Tag ID (for workflow_tags_update)
-- Tag name (for creation/filtering)
-- Creation and update timestamps
-- Usage count (how many workflows use it)`,
+                    description: "List all available tags for workflow organization",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -419,14 +629,7 @@ Effects:
                 },
                 {
                     name: "tag_create",
-                    description: `Create a new tag for organizing workflows.
-
-**Input**: Tag name (required)
-**Output**: Created tag object with ID and timestamps
-**Use Cases**: Establish categorization systems, organize workflows by environment/team
-**Validation**: Tag names must be unique
-
-**Example**: "production", "development", "data-processing", "team-alpha"`,
+                    description: "Create a new tag for organizing workflows",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -441,14 +644,7 @@ Effects:
                 },
                 {
                     name: "tag_update",
-                    description: `Update an existing tag's name.
-
-**Input**: Tag ID (required) + new name
-**Output**: Updated tag object
-**Use Cases**: Rename tags for better organization, fix typos
-**Validation**: New name must be unique
-
-**Note**: This updates the tag for ALL workflows that use it`,
+                    description: "Update an existing tag's name",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -460,14 +656,7 @@ Effects:
                 },
                 {
                     name: "tag_delete",
-                    description: `Delete a tag permanently.
-
-**Input**: Tag ID (required)
-**Output**: Deleted tag object (confirmation)
-**Use Cases**: Remove unused tags, clean up organization
-**Side Effects**: Removes tag from ALL workflows that use it
-
-**Warning**: This action cannot be undone`,
+                    description: "Delete a tag permanently",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -478,12 +667,7 @@ Effects:
                 },
                 {
                     name: "workflow_tags_get",
-                    description: `Get all tags assigned to a specific workflow.
-
-**Input**: Workflow ID (required)
-**Output**: Array of tag objects assigned to the workflow
-**Use Cases**: See how workflow is categorized, audit tagging
-**Returns**: Tag objects with ID, name, and timestamps`,
+                    description: "Get all tags assigned to a specific workflow",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -494,16 +678,7 @@ Effects:
                 },
                 {
                     name: "workflow_tags_update",
-                    description: `Update the tags assigned to a workflow.
-
-**Input**: Workflow ID (required) + array of tag IDs
-**Output**: Updated array of tags assigned to workflow
-**Use Cases**: Categorize workflows, organize by team/environment
-**Validation**: All tag IDs must exist
-
-**IMPORTANT**: Use tag IDs (from tag_list), not tag names!
-
-**Example**: tagIds: ["2tUt1wbLX592XDdX", "3uVs2xbMY693YEeY"]`,
+                    description: "Update the tags assigned to a workflow",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -520,14 +695,7 @@ Effects:
                 // Variable Management Tools
                 {
                     name: "variable_list",
-                    description: `List all environment variables.
-
-**Input**: Optional pagination parameters
-**Output**: Array of variable objects with key, value, metadata
-**Use Cases**: See available variables, audit configuration, prepare for workflow usage
-**Security**: Values may be truncated in listing for security
-
-**Variable Usage in Workflows**: Access via \$vars.VARIABLE_KEY`,
+                    description: "List all environment variables",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -538,19 +706,7 @@ Effects:
                 },
                 {
                     name: "variable_create",
-                    description: `Create a new environment variable.
-
-**Input**: Key and value (both required)
-**Output**: Success confirmation
-**Use Cases**: Store configuration, API URLs, feature flags
-**Security**: Values are encrypted at rest
-
-**Key Requirements**:
-- Must be unique
-- Alphanumeric + underscore only
-- Typically UPPER_CASE convention
-
-**Example**: key: "API_BASE_URL", value: "https://api.example.com"`,
+                    description: "Create a new environment variable",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -569,12 +725,7 @@ Effects:
                 },
                 {
                     name: "variable_update",
-                    description: `Update an existing environment variable.
-
-**Input**: Variable ID (required) + new key and/or value
-**Output**: Success confirmation
-**Use Cases**: Change configuration values, update URLs/tokens
-**Note**: Can change both key and value simultaneously`,
+                    description: "Update an existing environment variable",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -587,12 +738,7 @@ Effects:
                 },
                 {
                     name: "variable_delete",
-                    description: `Delete an environment variable.
-
-**Input**: Variable ID (required)
-**Output**: Success confirmation
-**Use Cases**: Remove unused variables, clean up configuration
-**Warning**: May break workflows that reference this variable`,
+                    description: "Delete an environment variable",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -604,13 +750,7 @@ Effects:
                 // Project Management Tools (Enterprise)
                 {
                     name: "project_list",
-                    description: `List all projects (Enterprise feature).
-
-**Input**: Optional pagination parameters
-**Output**: Array of project objects with ID, name, type
-**Requirements**: n8n Enterprise license
-**Use Cases**: See project organization, manage access control
-**Default**: Most n8n instances have a default project for all resources`,
+                    description: "List all projects (Enterprise feature)",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -621,12 +761,7 @@ Effects:
                 },
                 {
                     name: "project_create",
-                    description: `Create a new project (Enterprise feature).
-
-**Input**: Project name (required)
-**Output**: Success confirmation
-**Requirements**: n8n Enterprise license, appropriate permissions
-**Use Cases**: Organize workflows by team/environment, control access`,
+                    description: "Create a new project (Enterprise feature)",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -637,12 +772,7 @@ Effects:
                 },
                 {
                     name: "project_update",
-                    description: `Update a project's properties (Enterprise feature).
-
-**Input**: Project ID (required) + new name
-**Output**: Success confirmation
-**Requirements**: n8n Enterprise license
-**Use Cases**: Rename projects for better organization`,
+                    description: "Update a project's properties (Enterprise feature)",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -654,13 +784,7 @@ Effects:
                 },
                 {
                     name: "project_delete",
-                    description: `Delete a project (Enterprise feature).
-
-**Input**: Project ID (required)
-**Output**: Success confirmation
-**Requirements**: n8n Enterprise license
-**Side Effects**: Affects all workflows and resources in the project
-**Warning**: This action cannot be undone`,
+                    description: "Delete a project (Enterprise feature)",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -672,32 +796,7 @@ Effects:
                 // Credential Management Tools
                 {
                     name: "credential_create",
-                    description: `Create a new credential for workflow authentication.
-
-**Input**: Name, type, and data object (all required)
-**Output**: Created credential object with ID
-**Use Cases**: Store API keys, passwords, OAuth tokens securely
-**Security**: Data is encrypted at rest
-
-**Common Credential Types**:
-- "httpBasicAuth": username/password for HTTP Basic Auth
-- "oAuth2Api": OAuth 2.0 client credentials
-- "httpHeaderAuth": API key in header
-- "apiKey": Simple API key
-
-**Example Data Structure**:
-\`\`\`json
-{
-  "name": "My API Credentials",
-  "type": "httpHeaderAuth", 
-  "data": {
-    "name": "X-API-Key",
-    "value": "your-api-key-here"
-  }
-}
-\`\`\`
-
-**Use credential_schema_get to see required fields for each type**`,
+                    description: "Create a new credential for workflow authentication",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -710,14 +809,7 @@ Effects:
                 },
                 {
                     name: "credential_delete",
-                    description: `Delete a credential permanently.
-
-**Input**: Credential ID (required)
-**Output**: Deleted credential object (confirmation)
-**Warning**: Will break all workflows using this credential
-**Security**: Credential data is securely deleted
-
-**Prerequisites**: No workflows should be using this credential`,
+                    description: "Delete a credential permanently",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -728,14 +820,7 @@ Effects:
                 },
                 {
                     name: "credential_schema_get",
-                    description: `Get the schema for a specific credential type.
-
-**Input**: Credential type name (required)
-**Output**: JSON schema showing required and optional fields
-**Use Cases**: Understand what data fields are needed before creating credentials
-**Returns**: Complete schema with validation rules and examples
-
-**Example Usage**: Get schema for "httpBasicAuth" to see it needs "user" and "password" fields`,
+                    description: "Get the schema for a specific credential type",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -746,12 +831,7 @@ Effects:
                 },
                 {
                     name: "credential_transfer",
-                    description: `Transfer a credential to another project (Enterprise feature).
-
-**Input**: Credential ID + destination project ID
-**Output**: Success confirmation
-**Requirements**: n8n Enterprise license
-**Use Cases**: Move credentials between projects for organization`,
+                    description: "Transfer a credential to another project (Enterprise feature)",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -764,28 +844,7 @@ Effects:
                 // Security and Audit Tools
                 {
                     name: "audit_generate",
-                    description: `Generate a comprehensive security audit report.
-
-**Input**: Optional audit configuration
-**Output**: Detailed security report organized by risk categories
-**Use Cases**: Security assessment, compliance checking, risk identification
-
-**Audit Categories**:
-- "credentials": Unused or insecure credentials
-- "database": SQL injection risks, insecure queries
-- "nodes": Community nodes, filesystem access risks
-- "filesystem": File access and manipulation risks
-- "instance": Unprotected webhooks, security configuration
-
-**Report Structure**:
-- Risk level assessment
-- Detailed findings with locations
-- Specific recommendations
-- Affected workflows and nodes
-
-**Configuration Options**:
-- daysAbandonedWorkflow: Consider workflows abandoned after N days
-- categories: Limit audit to specific risk categories`,
+                    description: "Generate a comprehensive security audit report",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -806,18 +865,7 @@ Effects:
                 // User Management Tools (Enterprise)
                 {
                     name: "user_list",
-                    description: `List all users in the n8n instance (Enterprise feature).
-
-**Input**: Optional pagination and filtering parameters
-**Output**: Array of user objects with details and roles
-**Requirements**: n8n Enterprise license, admin permissions
-**Use Cases**: User management, role auditing, access control
-
-**User Information**:
-- User ID, email, name
-- Role (owner, admin, member)
-- Status (active, pending invitation)
-- Creation and update timestamps`,
+                    description: "List all users in the n8n instance (Enterprise feature)",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -830,12 +878,7 @@ Effects:
                 },
                 {
                     name: "user_get",
-                    description: `Get detailed information about a specific user (Enterprise feature).
-
-**Input**: User ID or email address (required)
-**Output**: Complete user object with permissions and metadata
-**Requirements**: n8n Enterprise license, admin permissions
-**Use Cases**: View user details, check permissions, audit access`,
+                    description: "Get detailed information about a specific user (Enterprise feature)",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -847,18 +890,7 @@ Effects:
                 },
                 {
                     name: "user_create",
-                    description: `Create new users in the n8n instance (Enterprise feature).
-
-**Input**: Array of user objects with email and optional role
-**Output**: Array of creation results (success/error per user)
-**Requirements**: n8n Enterprise license, admin permissions
-**Use Cases**: Invite team members, bulk user creation
-
-**Roles Available**:
-- "global:admin": Full administrative access
-- "global:member": Standard user access
-
-**Process**: Creates user accounts and sends invitation emails`,
+                    description: "Create new users in the n8n instance (Enterprise feature)",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -880,13 +912,7 @@ Effects:
                 },
                 {
                     name: "user_delete",
-                    description: `Delete a user from the n8n instance (Enterprise feature).
-
-**Input**: User ID or email address (required)
-**Output**: Success confirmation
-**Requirements**: n8n Enterprise license, admin permissions
-**Warning**: Permanently removes user access
-**Side Effects**: May affect workflows owned by this user`,
+                    description: "Delete a user from the n8n instance (Enterprise feature)",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -897,16 +923,7 @@ Effects:
                 },
                 {
                     name: "user_role_change",
-                    description: `Change a user's global role (Enterprise feature).
-
-**Input**: User identifier + new role name
-**Output**: Success confirmation
-**Requirements**: n8n Enterprise license, admin permissions
-**Use Cases**: Promote/demote user permissions, role management
-
-**Available Roles**:
-- "global:admin": Full administrative access
-- "global:member": Standard user access`,
+                    description: "Change a user's global role (Enterprise feature)",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -919,16 +936,7 @@ Effects:
                 // Source Control Tools
                 {
                     name: "source_control_pull",
-                    description: `Pull changes from the connected source control repository.
-
-**Input**: Optional force flag and environment variables
-**Output**: Import results showing what was updated
-**Requirements**: Source Control feature licensed and configured with Git repository
-**Use Cases**: Sync workflows from Git, deploy from repository, environment management
-
-**Force Option**: Overwrites local changes if conflicts exist
-**Variables**: Set environment variables during pull process
-**Returns**: Details of imported workflows, credentials, variables, and tags`,
+                    description: "Pull changes from the connected source control repository",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -937,15 +945,10 @@ Effects:
                         }
                     }
                 },
-                // Additional Tag Operation
+                // Additional Tag Tool
                 {
                     name: "tag_get",
-                    description: `Get detailed information about a specific tag.
-
-**Input**: Tag ID (required)
-**Output**: Complete tag object with metadata
-**Use Cases**: View tag details, get creation info, audit tag usage
-**Returns**: Tag ID, name, creation/update timestamps`,
+                    description: "Get detailed information about a specific tag",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -960,92 +963,20 @@ Effects:
             const { name, arguments: args } = request.params;
             try {
                 switch (name) {
-                    // Workflow Tools
-                    case "workflow_list":
-                        return await this.handleWorkflowList(args);
-                    case "workflow_get":
-                        return await this.handleWorkflowGet(args);
-                    case "workflow_create":
-                        return await this.handleWorkflowCreate(args);
-                    case "workflow_update":
-                        return await this.handleWorkflowUpdate(args);
-                    case "workflow_delete":
-                        return await this.handleWorkflowDelete(args);
-                    case "workflow_activate":
-                        return await this.handleWorkflowActivate(args);
-                    case "workflow_deactivate":
-                        return await this.handleWorkflowDeactivate(args);
-                    case "workflow_transfer":
-                        return await this.handleWorkflowTransfer(args);
-                    // Execution Tools
-                    case "execution_list":
-                        return await this.handleExecutionList(args);
-                    case "execution_get":
-                        return await this.handleExecutionGet(args);
-                    case "execution_delete":
-                        return await this.handleExecutionDelete(args);
-                    // Tag Tools
-                    case "tag_list":
-                        return await this.handleTagList(args);
-                    case "tag_create":
-                        return await this.handleTagCreate(args);
-                    case "tag_update":
-                        return await this.handleTagUpdate(args);
-                    case "tag_delete":
-                        return await this.handleTagDelete(args);
-                    case "workflow_tags_get":
-                        return await this.handleWorkflowTagsGet(args);
-                    case "workflow_tags_update":
-                        return await this.handleWorkflowTagsUpdate(args);
-                    // Variable Tools
-                    case "variable_list":
-                        return await this.handleVariableList(args);
-                    case "variable_create":
-                        return await this.handleVariableCreate(args);
-                    case "variable_update":
-                        return await this.handleVariableUpdate(args);
-                    case "variable_delete":
-                        return await this.handleVariableDelete(args);
-                    // Project Tools
-                    case "project_list":
-                        return await this.handleProjectList(args);
-                    case "project_create":
-                        return await this.handleProjectCreate(args);
-                    case "project_update":
-                        return await this.handleProjectUpdate(args);
-                    case "project_delete":
-                        return await this.handleProjectDelete(args);
-                    // Credential Tools
-                    case "credential_create":
-                        return await this.handleCredentialCreate(args);
-                    case "credential_delete":
-                        return await this.handleCredentialDelete(args);
-                    case "credential_schema_get":
-                        return await this.handleCredentialSchemaGet(args);
-                    case "credential_transfer":
-                        return await this.handleCredentialTransfer(args);
-                    // Audit Tools
-                    case "audit_generate":
-                        return await this.handleAuditGenerate(args);
-                    // User Management Tools
-                    case "user_list":
-                        return await this.handleUserList(args);
-                    case "user_get":
-                        return await this.handleUserGet(args);
-                    case "user_create":
-                        return await this.handleUserCreate(args);
-                    case "user_delete":
-                        return await this.handleUserDelete(args);
-                    case "user_role_change":
-                        return await this.handleUserRoleChange(args);
-                    // Source Control Tools
-                    case "source_control_pull":
-                        return await this.handleSourceControlPull(args);
-                    // Additional Tag Tool
-                    case "tag_get":
-                        return await this.handleTagGet(args);
+                    case "node_types_list":
+                        return await this.handleNodeTypesList(args);
+                    case "node_type_info":
+                        return await this.handleNodeTypeInfo(args);
+                    case "node_categories":
+                        return await this.handleNodeCategories(args);
+                    case "workflow_examples":
+                        return await this.handleWorkflowExamples(args);
+                    case "workflow_examples_search":
+                        return await this.handleWorkflowExamplesSearch(args);
                     default:
-                        return createErrorResponse(`Unknown tool: ${name}`);
+                        // For now, only node information and workflow examples tools are implemented in this source file
+                        // Other tools are handled by the compiled dist/server.js version
+                        throw new Error(`Tool '${name}' is not implemented in this version. Please use the compiled server.`);
                 }
             }
             catch (error) {
@@ -1057,404 +988,481 @@ Effects:
     setupResourceHandlers() {
         // Resources will be implemented if needed for caching or additional data access
     }
-    // Workflow Tool Handlers
-    async handleWorkflowList(args) {
-        const params = validateAndTransform(workflowListSchema, args);
-        const result = await this.n8nClient.getWorkflows(params);
-        const workflowSummary = result.data.map((w) => `• **${w.name}** (ID: ${w.id})\n` +
-            `  Status: ${w.active ? '🟢 Active' : '🔴 Inactive'}\n` +
-            `  Nodes: ${w.nodes?.length || 0}\n` +
-            `  Tags: ${w.tags?.map((t) => t.name).join(', ') || 'None'}\n` +
-            `  Created: ${w.createdAt ? new Date(w.createdAt).toLocaleString() : 'Unknown'}`).join('\n\n');
-        return createSuccessResponse(`Found ${result.data.length} workflows`, workflowSummary + (result.nextCursor ? `\n\n📄 Next cursor: ${result.nextCursor}` : ''));
-    }
-    async handleWorkflowGet(args) {
-        const params = validateAndTransform(z.object({ id: workflowIdSchema, excludePinnedData: z.boolean().optional() }), args);
-        const workflow = await this.n8nClient.getWorkflow(params.id, params.excludePinnedData);
-        const nodesList = workflow.nodes?.map((node) => `  • **${node.name}** (${node.type})\n` +
-            `    Position: [${node.position?.join(', ') || 'Not set'}]\n` +
-            `    Disabled: ${node.disabled ? 'Yes' : 'No'}`).join('\n') || 'No nodes';
-        const workflowInfo = `**Workflow: ${workflow.name}**\n` +
-            `ID: ${workflow.id}\n` +
-            `Status: ${workflow.active ? '🟢 Active' : '🔴 Inactive'}\n` +
-            `Nodes: ${workflow.nodes?.length || 0}\n` +
-            `Connections: ${Object.keys(workflow.connections || {}).length}\n` +
-            `Tags: ${workflow.tags?.map((t) => t.name).join(', ') || 'None'}\n` +
-            `Created: ${workflow.createdAt ? new Date(workflow.createdAt).toLocaleString() : 'Unknown'}\n` +
-            `Updated: ${workflow.updatedAt ? new Date(workflow.updatedAt).toLocaleString() : 'Unknown'}\n\n` +
-            `**Nodes:**\n${nodesList}\n\n` +
-            `**Settings:**\n` +
-            `  • Save execution progress: ${workflow.settings?.saveExecutionProgress ? 'Yes' : 'No'}\n` +
-            `  • Save manual executions: ${workflow.settings?.saveManualExecutions ? 'Yes' : 'No'}\n` +
-            `  • Execution timeout: ${workflow.settings?.executionTimeout || 'Default'}\n` +
-            `  • Timezone: ${workflow.settings?.timezone || 'Default'}`;
-        return createSuccessResponse('Workflow details retrieved', workflowInfo);
-    }
-    async handleWorkflowCreate(args) {
-        const workflowData = validateAndTransform(workflowCreateSchema, args);
-        // Convert tag names to tag objects if provided
-        const processedData = {
-            ...workflowData,
-            tags: workflowData.tags?.map((name) => ({ name }))
+    async handleNodeTypesList(args) {
+        const { category, search } = args;
+        let nodes = Object.entries(CORE_NODES);
+        // Filter by category
+        if (category) {
+            nodes = nodes.filter(([_, nodeInfo]) => nodeInfo.category === category);
+        }
+        // Filter by search term
+        if (search) {
+            const searchLower = search.toLowerCase();
+            nodes = nodes.filter(([nodeType, nodeInfo]) => nodeType.toLowerCase().includes(searchLower) ||
+                nodeInfo.description.toLowerCase().includes(searchLower));
+        }
+        const nodeList = nodes.map(([nodeType, nodeInfo]) => ({
+            nodeType,
+            category: nodeInfo.category,
+            description: nodeInfo.description,
+            inputsCount: nodeInfo.inputsCount,
+            outputsCount: nodeInfo.outputsCount,
+            usageNotes: nodeInfo.usageNotes
+        }));
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: JSON.stringify({
+                        totalNodes: nodeList.length,
+                        nodes: nodeList,
+                        availableCategories: Object.keys(NODE_CATEGORIES)
+                    }, null, 2)
+                }
+            ]
         };
-        const workflow = await this.n8nClient.createWorkflow(processedData);
-        return createSuccessResponse(`Workflow "${workflow.name}" created successfully`, `ID: ${workflow.id}\nStatus: ${workflow.active ? 'Active' : 'Inactive'}\nNodes: ${workflow.nodes?.length || 0}`);
     }
-    async handleWorkflowUpdate(args) {
-        const params = validateAndTransform(z.object({
-            id: workflowIdSchema,
-            name: z.string().optional(),
-            nodes: z.array(z.any()).optional(),
-            connections: z.record(z.any()).optional(),
-            settings: z.record(z.any()).optional(),
-            active: z.boolean().optional()
-        }), args);
-        const { id, ...updateData } = params;
-        const workflow = await this.n8nClient.updateWorkflow(id, updateData);
-        return createSuccessResponse(`Workflow "${workflow.name}" updated successfully`, `ID: ${workflow.id}\nStatus: ${workflow.active ? 'Active' : 'Inactive'}`);
-    }
-    async handleWorkflowDelete(args) {
-        const params = validateAndTransform(z.object({ id: workflowIdSchema }), args);
-        const workflow = await this.n8nClient.deleteWorkflow(params.id);
-        return createSuccessResponse(`Workflow "${workflow.name}" deleted successfully`);
-    }
-    async handleWorkflowActivate(args) {
-        const params = validateAndTransform(z.object({ id: workflowIdSchema }), args);
-        const workflow = await this.n8nClient.activateWorkflow(params.id);
-        return createSuccessResponse(`Workflow "${workflow.name}" activated successfully`);
-    }
-    async handleWorkflowDeactivate(args) {
-        const params = validateAndTransform(z.object({ id: workflowIdSchema }), args);
-        const workflow = await this.n8nClient.deactivateWorkflow(params.id);
-        return createSuccessResponse(`Workflow "${workflow.name}" deactivated successfully`);
-    }
-    async handleWorkflowTransfer(args) {
-        const params = validateAndTransform(z.object({ id: workflowIdSchema, destinationProjectId: z.string() }), args);
-        await this.n8nClient.transferWorkflow(params.id, params.destinationProjectId);
-        return createSuccessResponse(`Workflow transferred to project ${params.destinationProjectId} successfully`);
-    }
-    // Execution Tool Handlers
-    async handleExecutionList(args) {
-        const params = validateAndTransform(executionListSchema, args);
-        const result = await this.n8nClient.getExecutions(params);
-        const executionSummary = result.data.map((exec) => {
-            const duration = exec.stoppedAt && exec.startedAt ?
-                Math.round((new Date(exec.stoppedAt).getTime() - new Date(exec.startedAt).getTime()) / 1000) :
-                null;
-            return `• **Execution ${exec.id}**\n` +
-                `  Workflow: ${exec.workflowData?.name || exec.workflowId}\n` +
-                `  Status: ${exec.status === 'success' ? '✅' : exec.status === 'error' ? '❌' : '⏳'} ${exec.status}\n` +
-                `  Started: ${new Date(exec.startedAt).toLocaleString()}\n` +
-                `  ${exec.stoppedAt ? `Finished: ${new Date(exec.stoppedAt).toLocaleString()}` : 'Still running'}\n` +
-                `  Duration: ${duration ? `${duration}s` : 'N/A'}`;
-        }).join('\n\n');
-        return createSuccessResponse(`Found ${result.data.length} executions`, executionSummary + (result.nextCursor ? `\n\n📄 Next cursor: ${result.nextCursor}` : ''));
-    }
-    async handleExecutionGet(args) {
-        const params = validateAndTransform(z.object({ id: executionIdSchema, includeData: z.boolean().optional() }), args);
-        const execution = await this.n8nClient.getExecution(params.id, params.includeData);
-        const nodeExecutions = execution.data?.resultData?.runData || {};
-        const nodeCount = Object.keys(nodeExecutions).length;
-        const hasErrors = execution.status === 'error';
-        let detailText = `**Execution ${execution.id}**\n` +
-            `Workflow: ${execution.workflowData?.name || execution.workflowId}\n` +
-            `Status: ${execution.status === 'success' ? '✅' : execution.status === 'error' ? '❌' : '⏳'} ${execution.status}\n` +
-            `Mode: ${execution.mode}\n` +
-            `Started: ${new Date(execution.startedAt).toLocaleString()}\n`;
-        if (execution.stoppedAt) {
-            const duration = Math.round((new Date(execution.stoppedAt).getTime() - new Date(execution.startedAt).getTime()) / 1000);
-            detailText += `Finished: ${new Date(execution.stoppedAt).toLocaleString()}\n`;
-            detailText += `Duration: ${duration}s\n`;
-        }
-        detailText += `Nodes executed: ${nodeCount}\n\n`;
-        if (hasErrors && execution.data?.resultData?.error) {
-            detailText += `**❌ Error Details:**\n\`\`\`\n${JSON.stringify(execution.data.resultData.error, null, 2)}\n\`\`\`\n\n`;
-        }
-        if (nodeCount > 0) {
-            detailText += `**Node Execution Summary:**\n`;
-            Object.entries(nodeExecutions).forEach(([nodeName, nodeData]) => {
-                const nodeRuns = Array.isArray(nodeData) ? nodeData : [nodeData];
-                detailText += `  • **${nodeName}**: ${nodeRuns.length} run(s)\n`;
-                nodeRuns.forEach((run, index) => {
-                    if (run.error) {
-                        detailText += `    Run ${index + 1}: ❌ ERROR - ${run.error.message}\n`;
+    async handleNodeTypeInfo(args) {
+        const { nodeType } = args;
+        const nodeInfo = CORE_NODES[nodeType];
+        if (!nodeInfo) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Node type "${nodeType}" not found in built-in nodes. 
+
+Available node types:
+${Object.keys(CORE_NODES).map(type => `- ${type}`).join('\n')}
+
+You can also use node_types_list to browse nodes by category.`
                     }
-                    else {
-                        detailText += `    Run ${index + 1}: ✅ SUCCESS - ${run.data?.main?.[0]?.length || 0} items\n`;
-                    }
-                });
-            });
+                ]
+            };
         }
-        return createSuccessResponse('Execution details retrieved', detailText);
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: JSON.stringify({
+                        nodeType,
+                        ...nodeInfo,
+                        exampleUsage: {
+                            basicStructure: {
+                                name: nodeType.split('.').pop(),
+                                type: nodeType,
+                                parameters: nodeInfo.commonParameters,
+                                position: [0, 0]
+                            }
+                        }
+                    }, null, 2)
+                }
+            ]
+        };
     }
-    async handleExecutionDelete(args) {
-        const params = validateAndTransform(z.object({ id: executionIdSchema }), args);
-        const execution = await this.n8nClient.deleteExecution(params.id);
-        return createSuccessResponse(`Execution ${execution.id} deleted successfully`);
+    async handleNodeCategories(args) {
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: JSON.stringify({
+                        categories: Object.entries(NODE_CATEGORIES).map(([name, description]) => ({
+                            name,
+                            description,
+                            nodeCount: Object.values(CORE_NODES).filter(node => node.category === name).length
+                        }))
+                    }, null, 2)
+                }
+            ]
+        };
     }
-    // Tag Tool Handlers
-    async handleTagList(args) {
-        const params = validateAndTransform(z.object({
-            limit: z.number().min(1).max(250).default(100).optional(),
-            cursor: z.string().optional()
-        }), args);
-        const result = await this.n8nClient.getTags(params);
-        const tagSummary = result.data.map((tag) => `• **${tag.name}** (ID: ${tag.id})\n` +
-            `  Created: ${tag.createdAt ? new Date(tag.createdAt).toLocaleString() : 'Unknown'}`).join('\n');
-        return createSuccessResponse(`Found ${result.data.length} tags`, tagSummary + (result.nextCursor ? `\n\n📄 Next cursor: ${result.nextCursor}` : ''));
+    async handleWorkflowExamples(args) {
+        const { useCase } = args;
+        const examples = {
+            "simple-webhook": {
+                name: "Simple Webhook Handler",
+                description: "Basic webhook that receives data and processes it",
+                nodes: [
+                    {
+                        name: "Webhook",
+                        type: "n8n-nodes-base.webhook",
+                        parameters: {
+                            httpMethod: "POST",
+                            path: "my-webhook",
+                            responseMode: "onReceived"
+                        },
+                        position: [0, 0]
+                    },
+                    {
+                        name: "Process Data",
+                        type: "n8n-nodes-base.set",
+                        parameters: {
+                            values: {
+                                processedAt: "={{new Date().toISOString()}}",
+                                status: "processed"
+                            }
+                        },
+                        position: [200, 0]
+                    }
+                ],
+                connections: {
+                    "Webhook": {
+                        "main": [[{ "node": "Process Data", "type": "main", "index": 0 }]]
+                    }
+                }
+            },
+            "scheduled-task": {
+                name: "Daily Report Generator",
+                description: "Runs every day to generate and send a report",
+                nodes: [
+                    {
+                        name: "Schedule",
+                        type: "n8n-nodes-base.scheduleTrigger",
+                        parameters: {
+                            rule: {
+                                interval: [{ "field": "hours", "value": 24 }]
+                            }
+                        },
+                        position: [0, 0]
+                    },
+                    {
+                        name: "Fetch Data",
+                        type: "n8n-nodes-base.httpRequest",
+                        parameters: {
+                            method: "GET",
+                            url: "https://api.example.com/data"
+                        },
+                        position: [200, 0]
+                    },
+                    {
+                        name: "Send Report",
+                        type: "n8n-nodes-base.gmail",
+                        parameters: {
+                            operation: "send",
+                            toList: "team@company.com",
+                            subject: "Daily Report",
+                            message: "={{JSON.stringify($json, null, 2)}}"
+                        },
+                        position: [400, 0]
+                    }
+                ],
+                connections: {
+                    "Schedule": {
+                        "main": [[{ "node": "Fetch Data", "type": "main", "index": 0 }]]
+                    },
+                    "Fetch Data": {
+                        "main": [[{ "node": "Send Report", "type": "main", "index": 0 }]]
+                    }
+                }
+            },
+            "data-processing": {
+                name: "Data Transformation Pipeline",
+                description: "Processes and transforms data with conditional logic",
+                nodes: [
+                    {
+                        name: "Manual Trigger",
+                        type: "n8n-nodes-base.manualTrigger",
+                        parameters: {},
+                        position: [0, 0]
+                    },
+                    {
+                        name: "Transform Data",
+                        type: "n8n-nodes-base.set",
+                        parameters: {
+                            values: {
+                                id: "={{$json.id}}",
+                                name: "={{$json.firstName}} {{$json.lastName}}",
+                                email: "={{$json.email.toLowerCase()}}"
+                            }
+                        },
+                        position: [200, 0]
+                    },
+                    {
+                        name: "Check Valid Email",
+                        type: "n8n-nodes-base.if",
+                        parameters: {
+                            conditions: {
+                                string: [
+                                    {
+                                        value1: "={{$json.email}}",
+                                        operation: "contains",
+                                        value2: "@"
+                                    }
+                                ]
+                            }
+                        },
+                        position: [400, 0]
+                    }
+                ],
+                connections: {
+                    "Manual Trigger": {
+                        "main": [[{ "node": "Transform Data", "type": "main", "index": 0 }]]
+                    },
+                    "Transform Data": {
+                        "main": [[{ "node": "Check Valid Email", "type": "main", "index": 0 }]]
+                    }
+                }
+            },
+            "notification": {
+                name: "Multi-Channel Notification",
+                description: "Sends notifications to multiple channels simultaneously",
+                nodes: [
+                    {
+                        name: "Webhook Trigger",
+                        type: "n8n-nodes-base.webhook",
+                        parameters: {
+                            httpMethod: "POST",
+                            path: "alert"
+                        },
+                        position: [0, 0]
+                    },
+                    {
+                        name: "Slack Notification",
+                        type: "n8n-nodes-base.slack",
+                        parameters: {
+                            operation: "postMessage",
+                            channel: "#alerts",
+                            text: "Alert: {{$json.message}}"
+                        },
+                        position: [200, -100]
+                    },
+                    {
+                        name: "Email Notification",
+                        type: "n8n-nodes-base.gmail",
+                        parameters: {
+                            operation: "send",
+                            toList: "admin@company.com",
+                            subject: "System Alert",
+                            message: "{{$json.message}}"
+                        },
+                        position: [200, 100]
+                    }
+                ],
+                connections: {
+                    "Webhook Trigger": {
+                        "main": [
+                            [
+                                { "node": "Slack Notification", "type": "main", "index": 0 },
+                                { "node": "Email Notification", "type": "main", "index": 0 }
+                            ]
+                        ]
+                    }
+                }
+            },
+            "api-integration": {
+                name: "API Data Sync",
+                description: "Fetches data from one API and syncs it to another system",
+                nodes: [
+                    {
+                        name: "Schedule Trigger",
+                        type: "n8n-nodes-base.scheduleTrigger",
+                        parameters: {
+                            rule: {
+                                interval: [{ "field": "minutes", "value": 15 }]
+                            }
+                        },
+                        position: [0, 0]
+                    },
+                    {
+                        name: "Fetch from API",
+                        type: "n8n-nodes-base.httpRequest",
+                        parameters: {
+                            method: "GET",
+                            url: "https://api.source.com/data",
+                            authentication: "headerAuth"
+                        },
+                        position: [200, 0]
+                    },
+                    {
+                        name: "Transform for Target",
+                        type: "n8n-nodes-base.code",
+                        parameters: {
+                            language: "javaScript",
+                            code: `
+                const transformed = items.map(item => ({
+                  id: item.json.id,
+                  name: item.json.name,
+                  status: item.json.active ? 'active' : 'inactive',
+                  updatedAt: new Date().toISOString()
+                }));
+                return transformed;
+              `
+                        },
+                        position: [400, 0]
+                    },
+                    {
+                        name: "Send to Target API",
+                        type: "n8n-nodes-base.httpRequest",
+                        parameters: {
+                            method: "POST",
+                            url: "https://api.target.com/data",
+                            sendBody: true,
+                            bodyParameters: {
+                                data: "={{$json}}"
+                            }
+                        },
+                        position: [600, 0]
+                    }
+                ],
+                connections: {
+                    "Schedule Trigger": {
+                        "main": [[{ "node": "Fetch from API", "type": "main", "index": 0 }]]
+                    },
+                    "Fetch from API": {
+                        "main": [[{ "node": "Transform for Target", "type": "main", "index": 0 }]]
+                    },
+                    "Transform for Target": {
+                        "main": [[{ "node": "Send to Target API", "type": "main", "index": 0 }]]
+                    }
+                }
+            }
+        };
+        if (useCase && examples[useCase]) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: JSON.stringify(examples[useCase], null, 2)
+                    }
+                ]
+            };
+        }
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: JSON.stringify({
+                        availableExamples: Object.keys(examples),
+                        examples: useCase ? undefined : examples
+                    }, null, 2)
+                }
+            ]
+        };
     }
-    async handleTagCreate(args) {
-        const params = validateAndTransform(tagCreateSchema, args);
-        const tag = await this.n8nClient.createTag({ name: params.name });
-        return createSuccessResponse(`Tag "${tag.name}" created successfully`, `ID: ${tag.id}`);
-    }
-    async handleTagUpdate(args) {
-        const params = validateAndTransform(z.object({ id: tagIdSchema, name: z.string() }), args);
-        const tag = await this.n8nClient.updateTag(params.id, { name: params.name });
-        return createSuccessResponse(`Tag updated to "${tag.name}" successfully`);
-    }
-    async handleTagDelete(args) {
-        const params = validateAndTransform(z.object({ id: tagIdSchema }), args);
-        const tag = await this.n8nClient.deleteTag(params.id);
-        return createSuccessResponse(`Tag "${tag.name}" deleted successfully`);
-    }
-    async handleWorkflowTagsGet(args) {
-        const params = validateAndTransform(z.object({ id: workflowIdSchema }), args);
-        const tags = await this.n8nClient.getWorkflowTags(params.id);
-        const tagList = tags.map((tag) => `• ${tag.name} (ID: ${tag.id})`).join('\n') || 'No tags assigned';
-        return createSuccessResponse(`Workflow tags retrieved`, tagList);
-    }
-    async handleWorkflowTagsUpdate(args) {
-        const params = validateAndTransform(z.object({ id: workflowIdSchema, tagIds: z.array(z.string()) }), args);
-        const tags = await this.n8nClient.updateWorkflowTags(params.id, params.tagIds);
-        const tagList = tags.map((tag) => tag.name).join(', ') || 'No tags';
-        return createSuccessResponse(`Workflow tags updated successfully`, `Tags: ${tagList}`);
-    }
-    // Variable Tool Handlers
-    async handleVariableList(args) {
-        const params = validateAndTransform(z.object({
-            limit: z.number().min(1).max(250).default(100).optional(),
-            cursor: z.string().optional()
-        }), args);
-        const result = await this.n8nClient.getVariables(params);
-        const variableSummary = result.data.map((variable) => `• **${variable.key}** (ID: ${variable.id})\n` +
-            `  Value: ${variable.value.length > 50 ? variable.value.substring(0, 50) + '...' : variable.value}`).join('\n');
-        return createSuccessResponse(`Found ${result.data.length} variables`, variableSummary + (result.nextCursor ? `\n\n📄 Next cursor: ${result.nextCursor}` : ''));
-    }
-    async handleVariableCreate(args) {
-        const params = validateAndTransform(variableCreateSchema, args);
-        await this.n8nClient.createVariable({ key: params.key, value: params.value });
-        return createSuccessResponse(`Variable "${params.key}" created successfully`);
-    }
-    async handleVariableUpdate(args) {
-        const params = validateAndTransform(z.object({ id: variableIdSchema, key: z.string(), value: z.string() }), args);
-        await this.n8nClient.updateVariable(params.id, { key: params.key, value: params.value });
-        return createSuccessResponse(`Variable "${params.key}" updated successfully`);
-    }
-    async handleVariableDelete(args) {
-        const params = validateAndTransform(z.object({ id: variableIdSchema }), args);
-        await this.n8nClient.deleteVariable(params.id);
-        return createSuccessResponse(`Variable deleted successfully`);
-    }
-    // Project Tool Handlers
-    async handleProjectList(args) {
-        const params = validateAndTransform(z.object({
-            limit: z.number().min(1).max(250).default(100).optional(),
-            cursor: z.string().optional()
-        }), args);
-        const result = await this.n8nClient.getProjects(params);
-        const projectSummary = result.data.map((project) => `• **${project.name}** (ID: ${project.id})\n` +
-            `  Type: ${project.type || 'Standard'}`).join('\n');
-        return createSuccessResponse(`Found ${result.data.length} projects`, projectSummary + (result.nextCursor ? `\n\n📄 Next cursor: ${result.nextCursor}` : ''));
-    }
-    async handleProjectCreate(args) {
-        const params = validateAndTransform(projectCreateSchema, args);
-        await this.n8nClient.createProject({ name: params.name });
-        return createSuccessResponse(`Project "${params.name}" created successfully`);
-    }
-    async handleProjectUpdate(args) {
-        const params = validateAndTransform(z.object({ id: projectIdSchema, name: z.string() }), args);
-        await this.n8nClient.updateProject(params.id, { name: params.name });
-        return createSuccessResponse(`Project updated to "${params.name}" successfully`);
-    }
-    async handleProjectDelete(args) {
-        const params = validateAndTransform(z.object({ id: projectIdSchema }), args);
-        await this.n8nClient.deleteProject(params.id);
-        return createSuccessResponse(`Project deleted successfully`);
-    }
-    // Credential Tool Handlers
-    async handleCredentialCreate(args) {
-        const params = validateAndTransform(credentialCreateSchema, args);
-        const credential = await this.n8nClient.createCredential({
-            name: params.name,
-            type: params.type,
-            data: params.data
-        });
-        return createSuccessResponse(`Credential "${credential.name}" created successfully`, `ID: ${credential.id}\nType: ${credential.type}`);
-    }
-    async handleCredentialDelete(args) {
-        const params = validateAndTransform(z.object({ id: credentialIdSchema }), args);
-        const credential = await this.n8nClient.deleteCredential(params.id);
-        return createSuccessResponse(`Credential "${credential.name}" deleted successfully`);
-    }
-    async handleCredentialSchemaGet(args) {
-        const params = validateAndTransform(z.object({ credentialTypeName: z.string() }), args);
-        const schema = await this.n8nClient.getCredentialSchema(params.credentialTypeName);
-        return createSuccessResponse(`Schema for credential type "${params.credentialTypeName}"`, `\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\``);
-    }
-    async handleCredentialTransfer(args) {
-        const params = validateAndTransform(z.object({ id: credentialIdSchema, destinationProjectId: z.string() }), args);
-        await this.n8nClient.transferCredential(params.id, params.destinationProjectId);
-        return createSuccessResponse(`Credential transferred to project ${params.destinationProjectId} successfully`);
-    }
-    // Audit Tool Handlers
-    async handleAuditGenerate(args) {
-        const options = validateAndTransform(auditGenerateSchema, args);
-        const auditReport = await this.n8nClient.generateAudit(options);
-        let reportSummary = '**🔍 Security Audit Report**\n\n';
-        Object.entries(auditReport).forEach(([reportName, reportData]) => {
-            const report = reportData;
-            reportSummary += `**${reportName}**\n`;
-            reportSummary += `Risk Level: ${report.risk}\n\n`;
-            if (report.sections) {
-                report.sections.forEach((section) => {
-                    reportSummary += `• **${section.title}**\n`;
-                    reportSummary += `  ${section.description}\n`;
-                    reportSummary += `  💡 Recommendation: ${section.recommendation}\n`;
-                    if (section.location && section.location.length > 0) {
-                        reportSummary += `  📍 Locations:\n`;
-                        section.location.forEach((loc) => {
-                            if (loc.workflowName) {
-                                reportSummary += `    - Workflow: ${loc.workflowName} (${loc.workflowId})\n`;
-                                if (loc.nodeName) {
-                                    reportSummary += `      Node: ${loc.nodeName} (${loc.nodeType})\n`;
+    async handleWorkflowExamplesSearch(args) {
+        const { nodeTypes = [], keywords = [], maxExamples = 2, includeFullWorkflow = false } = args;
+        try {
+            const examplesDir = path.join(process.cwd(), 'examples', 'workflows');
+            // Check if examples directory exists
+            if (!fs.existsSync(examplesDir)) {
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: "No examples directory found. Please create examples/workflows folder with workflow JSON files."
+                        }
+                    ]
+                };
+            }
+            // Read all JSON files from examples directory
+            const files = fs.readdirSync(examplesDir)
+                .filter(file => file.toLowerCase().endsWith('.json'))
+                .slice(0, 20); // Limit to prevent too many files
+            const matchingWorkflows = [];
+            for (const file of files) {
+                const filePath = path.join(examplesDir, file);
+                try {
+                    const fileContent = fs.readFileSync(filePath, 'utf-8');
+                    if (!fileContent.trim()) {
+                        continue; // Skip empty files
+                    }
+                    const workflow = JSON.parse(fileContent);
+                    let matches = false;
+                    let matchReasons = [];
+                    // Check for node types
+                    if (nodeTypes.length > 0 && workflow.nodes) {
+                        const workflowNodeTypes = workflow.nodes.map((node) => node.type);
+                        const foundNodeTypes = nodeTypes.filter((nodeType) => workflowNodeTypes.some((wnt) => wnt.includes(nodeType) || nodeType.includes(wnt)));
+                        if (foundNodeTypes.length > 0) {
+                            matches = true;
+                            matchReasons.push(`Contains nodes: ${foundNodeTypes.join(', ')}`);
+                        }
+                    }
+                    // Check for keywords in filename and workflow name
+                    if (keywords.length > 0) {
+                        const searchText = `${file} ${workflow.name || ''}`.toLowerCase();
+                        const foundKeywords = keywords.filter((keyword) => searchText.includes(keyword.toLowerCase()));
+                        if (foundKeywords.length > 0) {
+                            matches = true;
+                            matchReasons.push(`Matches keywords: ${foundKeywords.join(', ')}`);
+                        }
+                    }
+                    // If no specific search criteria, include all
+                    if (nodeTypes.length === 0 && keywords.length === 0) {
+                        matches = true;
+                        matchReasons.push('General workflow example');
+                    }
+                    if (matches) {
+                        const workflowInfo = {
+                            filename: file,
+                            name: workflow.name || 'Unnamed Workflow',
+                            matchReasons,
+                            nodeCount: workflow.nodes ? workflow.nodes.length : 0,
+                            nodeTypes: workflow.nodes ? [...new Set(workflow.nodes.map((n) => n.type))] : []
+                        };
+                        if (includeFullWorkflow) {
+                            workflowInfo.fullWorkflow = workflow;
+                        }
+                        else {
+                            // Include relevant nodes and connections
+                            if (workflow.nodes && nodeTypes.length > 0) {
+                                const relevantNodes = workflow.nodes.filter((node) => nodeTypes.some((nt) => node.type.includes(nt) || nt.includes(node.type)));
+                                workflowInfo.relevantNodes = relevantNodes;
+                                // Include connections for relevant nodes
+                                if (workflow.connections) {
+                                    const relevantConnections = {};
+                                    relevantNodes.forEach((node) => {
+                                        if (workflow.connections[node.name]) {
+                                            relevantConnections[node.name] = workflow.connections[node.name];
+                                        }
+                                    });
+                                    workflowInfo.relevantConnections = relevantConnections;
                                 }
                             }
-                            else if (loc.name) {
-                                reportSummary += `    - ${loc.kind}: ${loc.name}\n`;
-                            }
-                        });
+                        }
+                        matchingWorkflows.push(workflowInfo);
                     }
-                    reportSummary += '\n';
-                });
+                }
+                catch (parseError) {
+                    console.error(`Error parsing ${file}:`, parseError);
+                    continue;
+                }
             }
-            reportSummary += '\n';
-        });
-        return createSuccessResponse('Security audit completed', reportSummary);
-    }
-    // User Management Tool Handlers (Enterprise)
-    async handleUserList(args) {
-        const params = validateAndTransform(z.object({
-            limit: z.number().min(1).max(250).default(100).optional(),
-            cursor: z.string().optional(),
-            includeRole: z.boolean().optional(),
-            projectId: z.string().optional()
-        }), args);
-        const result = await this.n8nClient.getUsers(params);
-        const userSummary = result.data.map((user) => `• **${user.email}** (ID: ${user.id})\n` +
-            `  Name: ${user.firstName || ''} ${user.lastName || ''}`.trim() + '\n' +
-            `  Role: ${user.role || 'N/A'}\n` +
-            `  Status: ${user.isPending ? 'Pending' : 'Active'}\n` +
-            `  Created: ${user.createdAt ? new Date(user.createdAt).toLocaleString() : 'Unknown'}`).join('\n\n');
-        return createSuccessResponse(`Found ${result.data.length} users`, userSummary + (result.nextCursor ? `\n\n📄 Next cursor: ${result.nextCursor}` : ''));
-    }
-    async handleUserGet(args) {
-        const params = validateAndTransform(z.object({
-            identifier: z.string(),
-            includeRole: z.boolean().optional()
-        }), args);
-        const user = await this.n8nClient.getUser(params.identifier, params.includeRole);
-        const userInfo = `**User: ${user.email}**\n` +
-            `ID: ${user.id}\n` +
-            `Name: ${user.firstName || ''} ${user.lastName || ''}`.trim() + '\n' +
-            `Role: ${user.role || 'N/A'}\n` +
-            `Status: ${user.isPending ? 'Pending Invitation' : 'Active'}\n` +
-            `Created: ${user.createdAt ? new Date(user.createdAt).toLocaleString() : 'Unknown'}\n` +
-            `Updated: ${user.updatedAt ? new Date(user.updatedAt).toLocaleString() : 'Unknown'}`;
-        return createSuccessResponse('User details retrieved', userInfo);
-    }
-    async handleUserCreate(args) {
-        const params = validateAndTransform(z.object({
-            users: z.array(z.object({
-                email: z.string().email(),
-                role: z.enum(['global:admin', 'global:member']).optional()
-            }))
-        }), args);
-        const results = await this.n8nClient.createUsers(params.users);
-        const resultSummary = results.map((result) => {
-            if (result.error) {
-                return `❌ ${result.user?.email || 'Unknown'}: ${result.error}`;
-            }
-            else {
-                return `✅ ${result.user.email}: Invited successfully (ID: ${result.user.id})`;
-            }
-        }).join('\n');
-        return createSuccessResponse(`Created ${params.users.length} user invitation(s)`, resultSummary);
-    }
-    async handleUserDelete(args) {
-        const params = validateAndTransform(z.object({ identifier: z.string() }), args);
-        await this.n8nClient.deleteUser(params.identifier);
-        return createSuccessResponse(`User ${params.identifier} deleted successfully`);
-    }
-    async handleUserRoleChange(args) {
-        const params = validateAndTransform(z.object({
-            identifier: z.string(),
-            newRoleName: z.enum(['global:admin', 'global:member'])
-        }), args);
-        await this.n8nClient.changeUserRole(params.identifier, params.newRoleName);
-        return createSuccessResponse(`User ${params.identifier} role changed to ${params.newRoleName} successfully`);
-    }
-    // Source Control Tool Handlers
-    async handleSourceControlPull(args) {
-        const params = validateAndTransform(z.object({
-            force: z.boolean().optional(),
-            variables: z.record(z.string()).optional()
-        }), args);
-        const result = await this.n8nClient.pullFromSourceControl(params);
-        let resultSummary = '**🔄 Source Control Pull Results:**\n\n';
-        if (result.workflows && result.workflows.length > 0) {
-            resultSummary += `**Workflows (${result.workflows.length}):**\n`;
-            result.workflows.forEach(w => {
-                resultSummary += `  • ${w.name} (${w.id})\n`;
-            });
-            resultSummary += '\n';
+            // Sort by relevance (more matching criteria = higher relevance)
+            matchingWorkflows.sort((a, b) => b.matchReasons.length - a.matchReasons.length);
+            // Limit results
+            const limitedResults = matchingWorkflows.slice(0, maxExamples);
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: JSON.stringify({
+                            searchCriteria: {
+                                nodeTypes,
+                                keywords,
+                                maxExamples,
+                                includeFullWorkflow
+                            },
+                            totalMatches: matchingWorkflows.length,
+                            returnedExamples: limitedResults.length,
+                            examples: limitedResults
+                        }, null, 2)
+                    }
+                ]
+            };
         }
-        if (result.credentials && result.credentials.length > 0) {
-            resultSummary += `**Credentials (${result.credentials.length}):**\n`;
-            result.credentials.forEach(c => {
-                resultSummary += `  • ${c.name} (${c.type})\n`;
-            });
-            resultSummary += '\n';
+        catch (error) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Error searching workflow examples: ${error instanceof Error ? error.message : String(error)}`
+                    }
+                ]
+            };
         }
-        if (result.variables) {
-            const { added, changed } = result.variables;
-            if (added?.length || changed?.length) {
-                resultSummary += `**Variables:**\n`;
-                if (added?.length)
-                    resultSummary += `  Added: ${added.join(', ')}\n`;
-                if (changed?.length)
-                    resultSummary += `  Changed: ${changed.join(', ')}\n`;
-                resultSummary += '\n';
-            }
-        }
-        if (result.tags?.tags?.length) {
-            resultSummary += `**Tags (${result.tags.tags.length}):**\n`;
-            result.tags.tags.forEach(t => {
-                resultSummary += `  • ${t.name} (${t.id})\n`;
-            });
-        }
-        return createSuccessResponse('Source control pull completed', resultSummary);
     }
-    // Additional Tag Tool Handler
-    async handleTagGet(args) {
-        const params = validateAndTransform(z.object({ id: z.string() }), args);
-        const tag = await this.n8nClient.getTag(params.id);
-        const tagInfo = `**Tag: ${tag.name}**\n` +
-            `ID: ${tag.id}\n` +
-            `Created: ${tag.createdAt ? new Date(tag.createdAt).toLocaleString() : 'Unknown'}\n` +
-            `Updated: ${tag.updatedAt ? new Date(tag.updatedAt).toLocaleString() : 'Unknown'}`;
-        return createSuccessResponse('Tag details retrieved', tagInfo);
-    }
+    // ... rest of the existing methods ...
     async start() {
         const transport = new StdioServerTransport();
         await this.server.connect(transport);

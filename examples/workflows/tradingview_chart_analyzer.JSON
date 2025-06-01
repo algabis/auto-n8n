@@ -1,0 +1,118 @@
+{
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "e9a97dd5-f1e7-4d5b-a6f1-be5f0c9eb96c",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "0f38fe62-36d9-43da-a992-a3981377e89e",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "position": [
+          420,
+          360
+        ],
+        "webhookId": "e9a97dd5-f1e7-4d5b-a6f1-be5f0c9eb96c",
+        "typeVersion": 2
+      },
+      {
+        "parameters": {
+          "resource": "image",
+          "operation": "analyze",
+          "modelId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "gpt-4o-mini",
+            "cachedResultName": "GPT-4O-MINI"
+          },
+          "text": "You are an expert financial analyst tasked with providing an advanced technical analyses of a stock or crypto currency chart provided. Your analysis will be based on various technical indicators and will provide simple insights for novice traders. Just explain to traders were you expect the market is moving. Also warn them this is not a binding advice. Make sure to explain everything in infant language.",
+          "inputType": "base64",
+          "options": {}
+        },
+        "id": "83959562-edf5-4d37-bd11-47186c6a31c7",
+        "name": "OpenAI",
+        "type": "@n8n/n8n-nodes-langchain.openAi",
+        "position": [
+          600,
+          360
+        ],
+        "typeVersion": 1.7,
+        "credentials": {}
+      },
+      {
+        "parameters": {
+          "respondWith": "text",
+          "responseBody": "={{ $json.content }}",
+          "options": {}
+        },
+        "id": "c6f1f833-7ba3-49c5-86df-f586e6bb5975",
+        "name": "Respond to Webhook",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "position": [
+          780,
+          360
+        ],
+        "typeVersion": 1.1
+      },
+      {
+        "parameters": {
+          "content": "## N8N en OpenAI image analyser",
+          "height": 300,
+          "width": 620
+        },
+        "id": "e3a38a76-283b-4567-a8da-315ef1e2bc4f",
+        "name": "Sticky Note",
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          380,
+          240
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "content": "## AI prompt\nYou are an expert financial analyst tasked with providing an advanced technical analyses of a stock or crypto currency chart provided. Your analysis will be based on various technical indicators and will provide simple insights for novice traders. Just explain to traders were you expect the market is moving. Also warn them this is not a binding advice. Make sure to explain everything in infant language.",
+          "height": 340,
+          "color": 5
+        },
+        "id": "8e7e26db-8767-4727-ab0c-900b50a73411",
+        "name": "Sticky Note1",
+        "type": "n8n-nodes-base.stickyNote",
+        "position": [
+          560,
+          560
+        ],
+        "typeVersion": 1
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "OpenAI",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "OpenAI": {
+        "main": [
+          [
+            {
+              "node": "Respond to Webhook",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "pinData": {},
+    "meta": {
+      "instanceId": "9372932c084cd15494618bd96dc069a1f95c387f39b142987f53f56c36a2fb37"
+    }
+  }
