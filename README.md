@@ -584,7 +584,21 @@ The server includes comprehensive error handling:
 
 ## License
 
-MIT License - see LICENSE file for details.
+This project is licensed under the **GNU Affero General Public License v3.0**.
+
+### What this means:
+- ✅ **Free to use** for personal and non-commercial projects
+- ✅ **Free to modify** and create derivative works
+- ✅ **Free to distribute** under the same license terms
+- ⚠️ **Commercial use requires** that the entire application be open-sourced under AGPL
+- ⚠️ **SaaS/hosting requires** that all source code be made available to users
+
+### Why AGPL?
+This license ensures that improvements and derivative works remain open and free for the community while preventing proprietary commercialization without giving back.
+
+**For commercial licensing inquiries**, please contact the project maintainers.
+
+See the [LICENSE](LICENSE) file for the full license text.
 
 ## Support
 

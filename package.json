@@ -30,7 +30,7 @@
     "windsurf"
   ],
   "author": "n8n MCP Server",
-  "license": "MIT",
+  "license": "AGPL-3.0",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "axios": "^1.9.0",
