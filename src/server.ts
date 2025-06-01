@@ -76,7 +76,17 @@ class N8nMcpServer {
         // Workflow Tools
         {
           name: "workflow_list",
-          description: "List all workflows with filtering options. Use this to browse available workflows, find specific workflows by name/tags, or get an overview of your n8n instance.",
+          description: `List all workflows with filtering options. 
+          
+**Input**: Optional filters for active status, tags, name, project, pagination
+**Output**: Array of workflow summaries with basic info (name, ID, status, node count)
+**Use Cases**: Browse workflows, find specific workflows, get instance overview
+**Pagination**: Uses cursor-based pagination with limit up to 250
+
+Example filters:
+- active: true (only active workflows)
+- tags: "production,staging" (workflows with these tags)
+- name: "Data Processing" (partial name match)`,
           inputSchema: {
             type: "object",
             properties: {
@@ -92,7 +102,18 @@ class N8nMcpServer {
         },
         {
           name: "workflow_get",
-          description: "Get detailed information about a specific workflow including nodes, connections, and settings. Use this to examine workflow structure, debug issues, or understand how a workflow works.",
+          description: `Get detailed information about a specific workflow.
+
+**Input**: Workflow ID (required), optional excludePinnedData flag
+**Output**: Complete workflow object with nodes, connections, settings, and metadata
+**Use Cases**: Examine workflow structure, debug issues, understand node configurations
+**Performance**: Set excludePinnedData=true for faster loading if you don't need test data
+
+Returns:
+- Full node definitions with parameters and credentials
+- Connection mappings between nodes
+- Workflow settings (execution, timeout, timezone)
+- Tags, creation/update timestamps`,
           inputSchema: {
             type: "object",
             properties: {
@@ -104,55 +125,135 @@ class N8nMcpServer {
         },
         {
           name: "workflow_create",
-          description: "Create a new workflow with nodes, connections, and settings. Use this to build automation workflows programmatically or duplicate existing workflow patterns.",
+          description: `Create a new workflow with nodes, connections, and settings.
+
+**CRITICAL**: All fields (name, nodes, connections, settings) are REQUIRED by n8n API!
+
+**Input Structure**:
+\`\`\`json
+{
+  "name": "My Workflow",
+  "nodes": [
+    {
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger", 
+      "position": [240, 300],
+      "parameters": {}
+    }
+  ],
+  "connections": {},
+  "settings": {
+    "saveExecutionProgress": false,
+    "saveManualExecutions": false,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  }
+}
+\`\`\`
+
+**Common Node Types**:
+- n8n-nodes-base.manualTrigger (manual execution)
+- n8n-nodes-base.webhook (HTTP webhook)
+- n8n-nodes-base.httpRequest (HTTP requests) 
+- n8n-nodes-base.code (JavaScript/Python code)
+- n8n-nodes-base.set (data transformation)
+
+**Connection Format**:
+\`\`\`json
+{
+  "Node1": {
+    "main": [[{"node": "Node2", "type": "main", "index": 0}]]
+  }
+}
+\`\`\`
+
+**Output**: Created workflow object with assigned ID`,
           inputSchema: {
             type: "object",
             properties: {
-              name: { type: "string", description: "Workflow name" },
+              name: { 
+                type: "string", 
+                description: "Workflow name (required)",
+                minLength: 1
+              },
               nodes: {
                 type: "array",
-                description: "Array of workflow nodes",
+                description: "Array of workflow nodes (required - must have at least one node)",
+                minItems: 1,
                 items: {
                   type: "object",
                   properties: {
-                    name: { type: "string", description: "Node name" },
-                    type: { type: "string", description: "Node type (e.g., 'n8n-nodes-base.httpRequest')" },
-                    parameters: { type: "object", description: "Node parameters/configuration" },
-                    position: { type: "array", items: { type: "number" }, description: "Node position [x, y]" },
-                    credentials: { type: "object", description: "Node credentials configuration" }
+                    name: { type: "string", description: "Node name (unique within workflow)" },
+                    type: { 
+                      type: "string", 
+                      description: "Node type (e.g., 'n8n-nodes-base.manualTrigger')",
+                      pattern: "^n8n-nodes-"
+                    },
+                    parameters: { 
+                      type: "object", 
+                      description: "Node parameters/configuration (required, use {} if empty)",
+                      default: {}
+                    },
+                    position: { 
+                      type: "array", 
+                      items: { type: "number" }, 
+                      minItems: 2,
+                      maxItems: 2,
+                      description: "Node position [x, y] coordinates" 
+                    },
+                    credentials: { type: "object", description: "Node credentials configuration" },
+                    disabled: { type: "boolean", description: "Whether node is disabled", default: false },
+                    notes: { type: "string", description: "Node notes/documentation" }
                   },
-                  required: ["name", "type"]
+                  required: ["name", "type", "position", "parameters"]
                 }
               },
-              connections: { type: "object", description: "Node connections object" },
+              connections: { 
+                type: "object", 
+                description: "Node connections object (required - use {} for no connections)",
+                default: {}
+              },
               settings: {
                 type: "object",
-                description: "Workflow settings",
+                description: "Workflow settings (required)",
                 properties: {
-                  saveExecutionProgress: { type: "boolean" },
-                  saveManualExecutions: { type: "boolean" },
-                  saveDataErrorExecution: { type: "string", enum: ["all", "none"] },
-                  saveDataSuccessExecution: { type: "string", enum: ["all", "none"] },
-                  executionTimeout: { type: "number" },
-                  timezone: { type: "string" }
-                }
+                  saveExecutionProgress: { type: "boolean", default: false },
+                  saveManualExecutions: { type: "boolean", default: false },
+                  saveDataErrorExecution: { type: "string", enum: ["all", "none"], default: "all" },
+                  saveDataSuccessExecution: { type: "string", enum: ["all", "none"], default: "all" },
+                  executionTimeout: { type: "number", maximum: 3600, description: "Timeout in seconds" },
+                  timezone: { type: "string", description: "Workflow timezone" }
+                },
+                required: ["saveExecutionProgress", "saveManualExecutions", "saveDataErrorExecution", "saveDataSuccessExecution"]
               },
-              tags: { type: "array", items: { type: "string" }, description: "Workflow tags" },
-              active: { type: "boolean", default: false, description: "Whether to activate the workflow immediately" }
+              tags: { type: "array", items: { type: "string" }, description: "Workflow tags (tag names, not IDs)" },
+              active: { type: "boolean", default: false, description: "Whether to activate immediately" }
             },
-            required: ["name"]
+            required: ["name", "nodes", "connections", "settings"]
           }
         },
         {
           name: "workflow_update",
-          description: "Update an existing workflow's properties, nodes, connections, or settings. Use this to modify workflows, fix issues, or add new functionality.",
+          description: `Update an existing workflow's properties.
+
+**Input**: Workflow ID (required) + any fields to update
+**Output**: Updated workflow object
+**Use Cases**: Modify workflows, fix issues, add functionality
+**Validation**: Maintains referential integrity of node connections
+
+Updatable fields:
+- name: Workflow name
+- nodes: Complete nodes array (replaces existing)
+- connections: Complete connections object
+- settings: Workflow settings object
+- active: Activation status`,
           inputSchema: {
             type: "object",
             properties: {
               id: { type: "string", description: "Workflow ID" },
               name: { type: "string", description: "New workflow name" },
-              nodes: { type: "array", description: "Updated nodes array" },
-              connections: { type: "object", description: "Updated connections object" },
+              nodes: { type: "array", description: "Updated nodes array (replaces all existing nodes)" },
+              connections: { type: "object", description: "Updated connections object (replaces all existing connections)" },
               settings: { type: "object", description: "Updated workflow settings" },
               active: { type: "boolean", description: "Activation status" }
             },
@@ -161,7 +262,19 @@ class N8nMcpServer {
         },
         {
           name: "workflow_delete",
-          description: "Delete a workflow permanently. Use with caution as this action cannot be undone.",
+          description: `Delete a workflow permanently.
+
+**WARNING**: This action cannot be undone!
+
+**Input**: Workflow ID (required)
+**Output**: Deleted workflow object (for confirmation)
+**Use Cases**: Clean up unused workflows, remove test workflows
+**Prerequisites**: Workflow must be deactivated first
+
+Side effects:
+- Removes all execution history
+- Breaks any webhook URLs
+- Removes workflow from all projects`,
           inputSchema: {
             type: "object",
             properties: {
@@ -172,7 +285,22 @@ class N8nMcpServer {
         },
         {
           name: "workflow_activate",
-          description: "Activate a workflow to enable automatic execution via triggers (webhooks, schedules, etc.). Use this to start workflow automation.",
+          description: `Activate a workflow to enable automatic execution.
+
+**Input**: Workflow ID (required)
+**Output**: Activated workflow object
+**Prerequisites**: 
+- Workflow must have trigger nodes (webhook, schedule, etc.)
+- All required credentials must be configured
+- Workflow must be valid (no broken connections)
+
+**Trigger Types That Enable Automation**:
+- Webhook trigger (enables HTTP endpoint)
+- Schedule trigger (enables cron execution)
+- Email trigger (monitors IMAP)
+- File trigger (monitors filesystem)
+
+**Note**: Manual triggers don't enable automation`,
           inputSchema: {
             type: "object",
             properties: {
@@ -183,7 +311,17 @@ class N8nMcpServer {
         },
         {
           name: "workflow_deactivate",
-          description: "Deactivate a workflow to stop automatic execution. Use this to pause workflow automation without deleting the workflow.",
+          description: `Deactivate a workflow to stop automatic execution.
+
+**Input**: Workflow ID (required)
+**Output**: Deactivated workflow object
+**Use Cases**: Pause automation, maintenance, debugging
+**Safe Operation**: Does not delete workflow or data
+
+Effects:
+- Stops webhook endpoints
+- Disables scheduled executions
+- Preserves workflow definition and history`,
           inputSchema: {
             type: "object",
             properties: {
@@ -194,7 +332,14 @@ class N8nMcpServer {
         },
         {
           name: "workflow_transfer",
-          description: "Transfer a workflow to another project (Enterprise feature). Use this for project organization and access control.",
+          description: `Transfer a workflow to another project (Enterprise feature).
+
+**Input**: Workflow ID + destination project ID
+**Output**: Success confirmation
+**Requirements**: n8n Enterprise license, appropriate permissions
+**Use Cases**: Project organization, access control management
+
+**Note**: Only available in n8n Enterprise installations`,
           inputSchema: {
             type: "object",
             properties: {
@@ -208,7 +353,24 @@ class N8nMcpServer {
         // Execution Tools
         {
           name: "execution_list",
-          description: "List workflow executions with filtering options. Use this to monitor workflow runs, find failed executions, or analyze execution patterns.",
+          description: `List workflow executions with filtering and analysis.
+
+**Input**: Optional filters for status, workflow, project, pagination
+**Output**: Array of execution summaries with timing and status info
+**Use Cases**: Monitor runs, find failures, analyze patterns, performance tracking
+
+**Status Filters**:
+- "error": Failed executions only
+- "success": Successful executions only  
+- "waiting": Currently running/waiting
+
+**Performance**: Set includeData=false for faster listing (default)
+
+**Output Information**:
+- Execution ID, workflow ID, status
+- Start/stop timestamps, duration
+- Execution mode (manual, trigger, webhook, etc.)
+- Basic error information (if failed)`,
           inputSchema: {
             type: "object",
             properties: {
@@ -223,19 +385,39 @@ class N8nMcpServer {
         },
         {
           name: "execution_get",
-          description: "Get detailed information about a specific execution including data, errors, and performance metrics. Use this for debugging failed workflows or analyzing execution results.",
+          description: `Get detailed execution information for debugging and analysis.
+
+**Input**: Execution ID (required), optional includeData flag
+**Output**: Complete execution object with node-by-node results
+**Use Cases**: Debug failed workflows, analyze data flow, performance analysis
+
+**Detailed Information Includes**:
+- Node execution results and timings
+- Data passed between nodes
+- Error messages and stack traces
+- Input/output data for each node
+- Execution timeline and bottlenecks
+
+**Performance**: Set includeData=true for full debugging info (slower)`,
           inputSchema: {
             type: "object",
             properties: {
-              id: { type: "string", description: "Execution ID" },
-              includeData: { type: "boolean", description: "Include full execution data" }
+              id: { type: "string", description: "Execution ID (numeric string)" },
+              includeData: { type: "boolean", description: "Include full execution data and node results" }
             },
             required: ["id"]
           }
         },
         {
           name: "execution_delete",
-          description: "Delete an execution record. Use this to clean up execution history or remove sensitive data.",
+          description: `Delete an execution record.
+
+**Input**: Execution ID (required)
+**Output**: Deleted execution object (confirmation)
+**Use Cases**: Clean up history, remove sensitive data, manage storage
+**Warning**: Removes execution data permanently
+
+**Note**: Does not affect the workflow definition, only this execution record`,
           inputSchema: {
             type: "object",
             properties: {
@@ -248,7 +430,17 @@ class N8nMcpServer {
         // Tag Management Tools
         {
           name: "tag_list",
-          description: "List all available tags for organizing workflows. Use this to see existing tags before creating or assigning them.",
+          description: `List all available tags for workflow organization.
+
+**Input**: Optional pagination parameters
+**Output**: Array of tag objects with ID, name, timestamps
+**Use Cases**: See existing tags, prepare for workflow tagging, audit organization
+
+**Tag Information**:
+- Tag ID (for workflow_tags_update)
+- Tag name (for creation/filtering)
+- Creation and update timestamps
+- Usage count (how many workflows use it)`,
           inputSchema: {
             type: "object",
             properties: {
@@ -259,30 +451,55 @@ class N8nMcpServer {
         },
         {
           name: "tag_create",
-          description: "Create a new tag for organizing workflows. Use this to establish workflow categorization systems.",
+          description: `Create a new tag for organizing workflows.
+
+**Input**: Tag name (required)
+**Output**: Created tag object with ID and timestamps
+**Use Cases**: Establish categorization systems, organize workflows by environment/team
+**Validation**: Tag names must be unique
+
+**Example**: "production", "development", "data-processing", "team-alpha"`,
           inputSchema: {
             type: "object",
             properties: {
-              name: { type: "string", description: "Tag name" }
+              name: { 
+                type: "string", 
+                description: "Tag name (must be unique)",
+                minLength: 1
+              }
             },
             required: ["name"]
           }
         },
         {
           name: "tag_update",
-          description: "Update an existing tag's name. Use this to rename tags for better organization.",
+          description: `Update an existing tag's name.
+
+**Input**: Tag ID (required) + new name
+**Output**: Updated tag object
+**Use Cases**: Rename tags for better organization, fix typos
+**Validation**: New name must be unique
+
+**Note**: This updates the tag for ALL workflows that use it`,
           inputSchema: {
             type: "object",
             properties: {
               id: { type: "string", description: "Tag ID" },
-              name: { type: "string", description: "New tag name" }
+              name: { type: "string", description: "New tag name (must be unique)" }
             },
             required: ["id", "name"]
           }
         },
         {
           name: "tag_delete",
-          description: "Delete a tag. This will remove the tag from all workflows that use it.",
+          description: `Delete a tag permanently.
+
+**Input**: Tag ID (required)
+**Output**: Deleted tag object (confirmation)
+**Use Cases**: Remove unused tags, clean up organization
+**Side Effects**: Removes tag from ALL workflows that use it
+
+**Warning**: This action cannot be undone`,
           inputSchema: {
             type: "object",
             properties: {
@@ -293,7 +510,12 @@ class N8nMcpServer {
         },
         {
           name: "workflow_tags_get",
-          description: "Get all tags assigned to a specific workflow. Use this to see how a workflow is categorized.",
+          description: `Get all tags assigned to a specific workflow.
+
+**Input**: Workflow ID (required)
+**Output**: Array of tag objects assigned to the workflow
+**Use Cases**: See how workflow is categorized, audit tagging
+**Returns**: Tag objects with ID, name, and timestamps`,
           inputSchema: {
             type: "object",
             properties: {
@@ -304,12 +526,25 @@ class N8nMcpServer {
         },
         {
           name: "workflow_tags_update",
-          description: "Update the tags assigned to a workflow. Use this to organize and categorize workflows.",
+          description: `Update the tags assigned to a workflow.
+
+**Input**: Workflow ID (required) + array of tag IDs
+**Output**: Updated array of tags assigned to workflow
+**Use Cases**: Categorize workflows, organize by team/environment
+**Validation**: All tag IDs must exist
+
+**IMPORTANT**: Use tag IDs (from tag_list), not tag names!
+
+**Example**: tagIds: ["2tUt1wbLX592XDdX", "3uVs2xbMY693YEeY"]`,
           inputSchema: {
             type: "object",
             properties: {
               id: { type: "string", description: "Workflow ID" },
-              tagIds: { type: "array", items: { type: "string" }, description: "Array of tag IDs to assign" }
+              tagIds: { 
+                type: "array", 
+                items: { type: "string" }, 
+                description: "Array of tag IDs to assign (replaces all existing tags)" 
+              }
             },
             required: ["id", "tagIds"]
           }
@@ -318,7 +553,14 @@ class N8nMcpServer {
         // Variable Management Tools
         {
           name: "variable_list",
-          description: "List all environment variables. Use this to see available variables for workflow configuration.",
+          description: `List all environment variables.
+
+**Input**: Optional pagination parameters
+**Output**: Array of variable objects with key, value, metadata
+**Use Cases**: See available variables, audit configuration, prepare for workflow usage
+**Security**: Values may be truncated in listing for security
+
+**Variable Usage in Workflows**: Access via \$vars.VARIABLE_KEY`,
           inputSchema: {
             type: "object",
             properties: {
@@ -329,19 +571,43 @@ class N8nMcpServer {
         },
         {
           name: "variable_create",
-          description: "Create a new environment variable. Use this to store configuration values that workflows can access.",
+          description: `Create a new environment variable.
+
+**Input**: Key and value (both required)
+**Output**: Success confirmation
+**Use Cases**: Store configuration, API URLs, feature flags
+**Security**: Values are encrypted at rest
+
+**Key Requirements**:
+- Must be unique
+- Alphanumeric + underscore only
+- Typically UPPER_CASE convention
+
+**Example**: key: "API_BASE_URL", value: "https://api.example.com"`,
           inputSchema: {
             type: "object",
             properties: {
-              key: { type: "string", description: "Variable key/name" },
-              value: { type: "string", description: "Variable value" }
+              key: { 
+                type: "string", 
+                description: "Variable key/name (must be unique, alphanumeric + underscore)",
+                pattern: "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              value: { 
+                type: "string", 
+                description: "Variable value (stored encrypted)" 
+              }
             },
             required: ["key", "value"]
           }
         },
         {
           name: "variable_update",
-          description: "Update an existing environment variable. Use this to change configuration values.",
+          description: `Update an existing environment variable.
+
+**Input**: Variable ID (required) + new key and/or value
+**Output**: Success confirmation
+**Use Cases**: Change configuration values, update URLs/tokens
+**Note**: Can change both key and value simultaneously`,
           inputSchema: {
             type: "object",
             properties: {
@@ -354,7 +620,12 @@ class N8nMcpServer {
         },
         {
           name: "variable_delete",
-          description: "Delete an environment variable. Use this to remove unused configuration values.",
+          description: `Delete an environment variable.
+
+**Input**: Variable ID (required)
+**Output**: Success confirmation
+**Use Cases**: Remove unused variables, clean up configuration
+**Warning**: May break workflows that reference this variable`,
           inputSchema: {
             type: "object",
             properties: {
@@ -367,7 +638,13 @@ class N8nMcpServer {
         // Project Management Tools (Enterprise)
         {
           name: "project_list",
-          description: "List all projects (Enterprise feature). Use this to see project organization and manage access control.",
+          description: `List all projects (Enterprise feature).
+
+**Input**: Optional pagination parameters
+**Output**: Array of project objects with ID, name, type
+**Requirements**: n8n Enterprise license
+**Use Cases**: See project organization, manage access control
+**Default**: Most n8n instances have a default project for all resources`,
           inputSchema: {
             type: "object",
             properties: {
@@ -378,7 +655,12 @@ class N8nMcpServer {
         },
         {
           name: "project_create",
-          description: "Create a new project (Enterprise feature). Use this to organize workflows and manage team access.",
+          description: `Create a new project (Enterprise feature).
+
+**Input**: Project name (required)
+**Output**: Success confirmation
+**Requirements**: n8n Enterprise license, appropriate permissions
+**Use Cases**: Organize workflows by team/environment, control access`,
           inputSchema: {
             type: "object",
             properties: {
@@ -389,7 +671,12 @@ class N8nMcpServer {
         },
         {
           name: "project_update",
-          description: "Update a project's properties (Enterprise feature). Use this to rename or reconfigure projects.",
+          description: `Update a project's properties (Enterprise feature).
+
+**Input**: Project ID (required) + new name
+**Output**: Success confirmation
+**Requirements**: n8n Enterprise license
+**Use Cases**: Rename projects for better organization`,
           inputSchema: {
             type: "object",
             properties: {
@@ -401,7 +688,13 @@ class N8nMcpServer {
         },
         {
           name: "project_delete",
-          description: "Delete a project (Enterprise feature). This will affect all workflows and resources in the project.",
+          description: `Delete a project (Enterprise feature).
+
+**Input**: Project ID (required)
+**Output**: Success confirmation
+**Requirements**: n8n Enterprise license
+**Side Effects**: Affects all workflows and resources in the project
+**Warning**: This action cannot be undone`,
           inputSchema: {
             type: "object",
             properties: {
@@ -414,7 +707,32 @@ class N8nMcpServer {
         // Credential Management Tools
         {
           name: "credential_create",
-          description: "Create a new credential for workflow authentication. Use this to store API keys, passwords, and other authentication data securely.",
+          description: `Create a new credential for workflow authentication.
+
+**Input**: Name, type, and data object (all required)
+**Output**: Created credential object with ID
+**Use Cases**: Store API keys, passwords, OAuth tokens securely
+**Security**: Data is encrypted at rest
+
+**Common Credential Types**:
+- "httpBasicAuth": username/password for HTTP Basic Auth
+- "oAuth2Api": OAuth 2.0 client credentials
+- "httpHeaderAuth": API key in header
+- "apiKey": Simple API key
+
+**Example Data Structure**:
+\`\`\`json
+{
+  "name": "My API Credentials",
+  "type": "httpHeaderAuth", 
+  "data": {
+    "name": "X-API-Key",
+    "value": "your-api-key-here"
+  }
+}
+\`\`\`
+
+**Use credential_schema_get to see required fields for each type**`,
           inputSchema: {
             type: "object",
             properties: {
@@ -427,7 +745,14 @@ class N8nMcpServer {
         },
         {
           name: "credential_delete",
-          description: "Delete a credential. This will affect all workflows using this credential.",
+          description: `Delete a credential permanently.
+
+**Input**: Credential ID (required)
+**Output**: Deleted credential object (confirmation)
+**Warning**: Will break all workflows using this credential
+**Security**: Credential data is securely deleted
+
+**Prerequisites**: No workflows should be using this credential`,
           inputSchema: {
             type: "object",
             properties: {
@@ -438,7 +763,14 @@ class N8nMcpServer {
         },
         {
           name: "credential_schema_get",
-          description: "Get the schema for a specific credential type. Use this to understand what data fields are required for different credential types.",
+          description: `Get the schema for a specific credential type.
+
+**Input**: Credential type name (required)
+**Output**: JSON schema showing required and optional fields
+**Use Cases**: Understand what data fields are needed before creating credentials
+**Returns**: Complete schema with validation rules and examples
+
+**Example Usage**: Get schema for "httpBasicAuth" to see it needs "user" and "password" fields`,
           inputSchema: {
             type: "object",
             properties: {
@@ -449,7 +781,12 @@ class N8nMcpServer {
         },
         {
           name: "credential_transfer",
-          description: "Transfer a credential to another project (Enterprise feature). Use this for project organization.",
+          description: `Transfer a credential to another project (Enterprise feature).
+
+**Input**: Credential ID + destination project ID
+**Output**: Success confirmation
+**Requirements**: n8n Enterprise license
+**Use Cases**: Move credentials between projects for organization`,
           inputSchema: {
             type: "object",
             properties: {
@@ -463,7 +800,28 @@ class N8nMcpServer {
         // Security and Audit Tools
         {
           name: "audit_generate",
-          description: "Generate a comprehensive security audit report. Use this to identify security risks, unused credentials, and potential vulnerabilities in your n8n instance.",
+          description: `Generate a comprehensive security audit report.
+
+**Input**: Optional audit configuration
+**Output**: Detailed security report organized by risk categories
+**Use Cases**: Security assessment, compliance checking, risk identification
+
+**Audit Categories**:
+- "credentials": Unused or insecure credentials
+- "database": SQL injection risks, insecure queries
+- "nodes": Community nodes, filesystem access risks
+- "filesystem": File access and manipulation risks
+- "instance": Unprotected webhooks, security configuration
+
+**Report Structure**:
+- Risk level assessment
+- Detailed findings with locations
+- Specific recommendations
+- Affected workflows and nodes
+
+**Configuration Options**:
+- daysAbandonedWorkflow: Consider workflows abandoned after N days
+- categories: Limit audit to specific risk categories`,
           inputSchema: {
             type: "object",
             properties: {
@@ -485,7 +843,18 @@ class N8nMcpServer {
         // User Management Tools (Enterprise)
         {
           name: "user_list",
-          description: "List all users in the n8n instance (Enterprise feature). Use this to manage user access and roles.",
+          description: `List all users in the n8n instance (Enterprise feature).
+
+**Input**: Optional pagination and filtering parameters
+**Output**: Array of user objects with details and roles
+**Requirements**: n8n Enterprise license, admin permissions
+**Use Cases**: User management, role auditing, access control
+
+**User Information**:
+- User ID, email, name
+- Role (owner, admin, member)
+- Status (active, pending invitation)
+- Creation and update timestamps`,
           inputSchema: {
             type: "object",
             properties: {
@@ -498,7 +867,12 @@ class N8nMcpServer {
         },
         {
           name: "user_get",
-          description: "Get detailed information about a specific user (Enterprise feature). Use this to view user details and permissions.",
+          description: `Get detailed information about a specific user (Enterprise feature).
+
+**Input**: User ID or email address (required)
+**Output**: Complete user object with permissions and metadata
+**Requirements**: n8n Enterprise license, admin permissions
+**Use Cases**: View user details, check permissions, audit access`,
           inputSchema: {
             type: "object",
             properties: {
@@ -510,7 +884,18 @@ class N8nMcpServer {
         },
         {
           name: "user_create",
-          description: "Create new users in the n8n instance (Enterprise feature). Use this to invite team members and assign roles.",
+          description: `Create new users in the n8n instance (Enterprise feature).
+
+**Input**: Array of user objects with email and optional role
+**Output**: Array of creation results (success/error per user)
+**Requirements**: n8n Enterprise license, admin permissions
+**Use Cases**: Invite team members, bulk user creation
+
+**Roles Available**:
+- "global:admin": Full administrative access
+- "global:member": Standard user access
+
+**Process**: Creates user accounts and sends invitation emails`,
           inputSchema: {
             type: "object",
             properties: {
@@ -532,7 +917,13 @@ class N8nMcpServer {
         },
         {
           name: "user_delete",
-          description: "Delete a user from the n8n instance (Enterprise feature). Use this to remove user access.",
+          description: `Delete a user from the n8n instance (Enterprise feature).
+
+**Input**: User ID or email address (required)
+**Output**: Success confirmation
+**Requirements**: n8n Enterprise license, admin permissions
+**Warning**: Permanently removes user access
+**Side Effects**: May affect workflows owned by this user`,
           inputSchema: {
             type: "object",
             properties: {
@@ -543,7 +934,16 @@ class N8nMcpServer {
         },
         {
           name: "user_role_change",
-          description: "Change a user's global role (Enterprise feature). Use this to promote or demote user permissions.",
+          description: `Change a user's global role (Enterprise feature).
+
+**Input**: User identifier + new role name
+**Output**: Success confirmation
+**Requirements**: n8n Enterprise license, admin permissions
+**Use Cases**: Promote/demote user permissions, role management
+
+**Available Roles**:
+- "global:admin": Full administrative access
+- "global:member": Standard user access`,
           inputSchema: {
             type: "object",
             properties: {
@@ -557,7 +957,16 @@ class N8nMcpServer {
         // Source Control Tools
         {
           name: "source_control_pull",
-          description: "Pull changes from the connected source control repository. Use this to sync workflows and configurations from your Git repository.",
+          description: `Pull changes from the connected source control repository.
+
+**Input**: Optional force flag and environment variables
+**Output**: Import results showing what was updated
+**Requirements**: Source Control feature licensed and configured with Git repository
+**Use Cases**: Sync workflows from Git, deploy from repository, environment management
+
+**Force Option**: Overwrites local changes if conflicts exist
+**Variables**: Set environment variables during pull process
+**Returns**: Details of imported workflows, credentials, variables, and tags`,
           inputSchema: {
             type: "object",
             properties: {
@@ -567,10 +976,15 @@ class N8nMcpServer {
           }
         },
 
-        // Individual Tag Operation
+        // Additional Tag Operation
         {
           name: "tag_get",
-          description: "Get detailed information about a specific tag. Use this to view tag details and metadata.",
+          description: `Get detailed information about a specific tag.
+
+**Input**: Tag ID (required)
+**Output**: Complete tag object with metadata
+**Use Cases**: View tag details, get creation info, audit tag usage
+**Returns**: Tag ID, name, creation/update timestamps`,
           inputSchema: {
             type: "object",
             properties: {

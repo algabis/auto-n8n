@@ -61,6 +61,7 @@ cd n8n-mcp
 Create a `.env` file in the project root:
 ```env
 # n8n API Configuration (REQUIRED)
+# ⚠️ IMPORTANT: Do NOT include /api/v1/ in the URL
 N8N_BASE_URL=https://your-n8n-instance.com
 N8N_API_KEY=your-api-key-here
 
@@ -236,11 +237,17 @@ npm run dev
 ### Environment Variables
 | Variable | Description | Default | Validation |
 |----------|-------------|---------|------------|
-| `N8N_BASE_URL` | Base URL of your n8n instance | Required | Must start with http:// or https:// |
+| `N8N_BASE_URL` | Base URL of your n8n instance ⚠️ **Do NOT include `/api/v1`** | Required | Must start with http:// or https:// |
 | `N8N_API_KEY` | n8n API key for authentication | Required | Must not be empty |
 | `REQUEST_TIMEOUT` | API request timeout in milliseconds | 30000 | Optional |
 | `MAX_RETRY_ATTEMPTS` | Number of retry attempts for failed requests | 3 | Optional |
 | `LOG_LEVEL` | Logging level (info, debug, warn, error) | info | Optional |
+
+#### ⚠️ **Important URL Configuration**
+- ✅ **Correct**: `N8N_BASE_URL=https://your-n8n-instance.com`
+- ❌ **Wrong**: `N8N_BASE_URL=https://your-n8n-instance.com/api/v1/`
+
+The MCP server automatically appends `/api/v1/` to API requests. Including it in your base URL will cause "Resource not found" errors.
 
 ### Automatic Validation
 When using deployment scripts, the following validations are performed:
@@ -469,6 +476,7 @@ For Cursor IDE, place the configuration in `~/.cursor/mcp.json` (Linux/Mac) or `
 **⚠️ Important**: 
 - Use **absolute paths** in the `args` field - relative paths and `cwd` may not work reliably
 - Include environment variables directly in the `env` object
+- **Do NOT include `/api/v1/` in N8N_BASE_URL** - use just the domain
 - Restart Cursor completely after modifying `mcp.json`
 
 ### Other MCP Clients

@@ -194,12 +194,15 @@ N8N_API_KEY=your-api-key-here
 
 ### Issue: n8n API connection failures
 
-**Symptoms**: Network timeouts, connection refused
+**Symptoms**: Network timeouts, connection refused, "Resource not found" errors
 
 **Solutions**:
-1. **Verify n8n URL**: Ensure it's accessible
-2. **Check network**: Firewall, VPN, proxy settings
-3. **Test manually**:
+1. **Check URL format**: Remove `/api/v1/` from N8N_BASE_URL
+   - ✅ Correct: `https://your-n8n-instance.com`
+   - ❌ Wrong: `https://your-n8n-instance.com/api/v1/`
+2. **Verify n8n URL**: Ensure it's accessible
+3. **Check network**: Firewall, VPN, proxy settings
+4. **Test manually**:
    ```bash
    curl -H "X-N8N-API-KEY: your-key" https://your-n8n-instance.com/api/v1/workflows
    ```
@@ -424,7 +427,8 @@ If issues persist:
 | Missing .env | `cp env.example .env` |
 | TypeScript errors | `npm install typescript && npm run build` |
 | Permission denied | `sudo` or add user to docker group |
-| Module not found | `rm -rf node_modules && npm install` |
+| Module not found | `rm -rf node_modules && npm install` | 
+| **API "not found" errors** | **Remove `/api/v1/` from N8N_BASE_URL** |
 | **MCP client closed** | **Use absolute path in mcp.json + env vars** |
 | **Missing npm script** | **Use node command instead of npm** |
 | **Cannot find module** | **Check absolute path in mcp.json args** |
