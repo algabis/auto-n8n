@@ -368,16 +368,48 @@ Generate comprehensive security audit reports.
 
 ### Claude Desktop
 
-#### Native Installation
+#### Native Installation (Recommended)
 ```json
 {
   "mcpServers": {
-    "n8n": {
+    "n8n-mcp": {
       "command": "node",
-      "args": ["path/to/n8n-mcp/dist/server.js"],
+      "args": ["/absolute/path/to/n8n-mcp/dist/server.js"],
       "env": {
         "N8N_BASE_URL": "https://your-n8n-instance.com",
-        "N8N_API_KEY": "your-api-key"
+        "N8N_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+**Windows Example:**
+```json
+{
+  "mcpServers": {
+    "n8n-mcp": {
+      "command": "node",
+      "args": ["D:\\projects\\n8n-mcp\\dist\\server.js"],
+      "env": {
+        "N8N_BASE_URL": "https://your-n8n-instance.com",
+        "N8N_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+**Linux/Mac Example:**
+```json
+{
+  "mcpServers": {
+    "n8n-mcp": {
+      "command": "node",
+      "args": ["/home/user/n8n-mcp/dist/server.js"],
+      "env": {
+        "N8N_BASE_URL": "https://your-n8n-instance.com",
+        "N8N_API_KEY": "your-api-key-here"
       }
     }
   }
@@ -415,9 +447,32 @@ Generate comprehensive security audit reports.
 }
 ```
 
+### Cursor IDE
+
+For Cursor IDE, place the configuration in `~/.cursor/mcp.json` (Linux/Mac) or `C:\Users\<username>\.cursor\mcp.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "n8n-mcp": {
+      "command": "node",
+      "args": ["/absolute/path/to/n8n-mcp/dist/server.js"],
+      "env": {
+        "N8N_BASE_URL": "https://your-n8n-instance.com",
+        "N8N_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+**⚠️ Important**: 
+- Use **absolute paths** in the `args` field - relative paths and `cwd` may not work reliably
+- Include environment variables directly in the `env` object
+- Restart Cursor completely after modifying `mcp.json`
+
 ### Other MCP Clients
 The server implements the standard MCP protocol and works with:
-- **Cursor IDE**: Full MCP support for code assistance
 - **Windsurf**: Integrated workflow management
 - **n8n Native MCP Nodes**: n8n 1.88.0+ includes built-in MCP Server Trigger and MCP Client Tool nodes
 - Any MCP-compatible client

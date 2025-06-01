@@ -16,7 +16,7 @@
     "test:watch": "jest --watch",
     "type-check": "tsc --noEmit",
     "start:prod": "npm run build:alt && npm run start"
-    },
+  },
   "keywords": [
     "n8n",
     "mcp",

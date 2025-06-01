@@ -228,6 +228,144 @@ N8N_API_KEY=your-api-key-here
 - Docker Desktop must be running
 - Check Xcode command line tools
 
+## MCP Client Configuration Issues
+
+### Issue: Cursor shows "client closed" and no tools listed
+
+**Symptoms**: 
+- MCP server starts successfully when run manually
+- Cursor MCP panel shows "client closed"
+- No tools appear in the MCP offerings
+
+**Common Causes**:
+1. **Relative paths in mcp.json**: Cursor may not respect the `cwd` field
+2. **Missing environment variables**: Server exits early due to missing config
+3. **Incorrect command format**: Using npm commands without proper working directory
+
+**Solutions**:
+
+#### 1. Use Absolute Paths (Recommended)
+Update your `~/.cursor/mcp.json` or `C:\Users\<username>\.cursor\mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "n8n-mcp": {
+      "command": "node",
+      "args": ["D:\\projects\\n8n-mcp\\dist\\server.js"],
+      "env": {
+        "N8N_BASE_URL": "https://your-n8n-instance.com",
+        "N8N_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+**Key Points**:
+- Use full absolute path to `dist/server.js`
+- Include environment variables directly in `env` object
+- Remove any `cwd` field (may be ignored)
+
+#### 2. Verify MCP Configuration Location
+- **Windows**: `C:\Users\<username>\.cursor\mcp.json`
+- **Linux/Mac**: `~/.cursor/mcp.json`
+- Ensure there's only ONE mcp.json file
+
+#### 3. Test Server Manually
+Before configuring MCP client, verify server works:
+```bash
+cd /path/to/n8n-mcp
+N8N_BASE_URL="https://your-instance.com" N8N_API_KEY="your-key" node dist/server.js
+```
+
+Should output: `🚀 n8n MCP Server started successfully`
+
+#### 4. Check Cursor Logs
+- Open Cursor Command Palette (Ctrl+Shift+P)
+- Search for "MCP Logs" or "Show Logs"
+- Look for errors like:
+  - `Cannot find module` - indicates path issues
+  - `Missing script` - indicates npm command issues
+  - Connection errors - indicates server startup failures
+
+#### 5. Restart Cursor Completely
+After any mcp.json changes:
+- Close all Cursor windows
+- Quit Cursor application completely
+- Restart Cursor
+- Check MCP panel for connection
+
+### Issue: Claude Desktop MCP not connecting
+
+**Solutions**:
+1. **Check config location**: `%APPDATA%\Claude\claude_desktop_config.json` (Windows)
+2. **Use same absolute path format** as Cursor solution above
+3. **Restart Claude Desktop** after configuration changes
+
+### Issue: Environment variables not loaded
+
+**Symptoms**: Server exits with "Missing required environment variable" error
+
+**Solutions**:
+1. **Include in mcp.json** (recommended):
+   ```json
+   {
+     "mcpServers": {
+       "n8n-mcp": {
+         "command": "node",
+         "args": ["/absolute/path/to/dist/server.js"],
+         "env": {
+           "N8N_BASE_URL": "https://your-n8n-instance.com",
+           "N8N_API_KEY": "your-api-key"
+         }
+       }
+     }
+   }
+   ```
+
+2. **Alternative**: Use .env file and modify command:
+   ```json
+   {
+     "mcpServers": {
+       "n8n-mcp": {
+         "command": "node",
+         "args": ["-r", "dotenv/config", "/absolute/path/to/dist/server.js"],
+         "cwd": "/absolute/path/to/n8n-mcp"
+       }
+     }
+   }
+   ```
+
+### Issue: npm commands fail in MCP clients
+
+**Error**: `npm error Missing script: "start:prod"`
+
+**Cause**: MCP clients may not properly handle npm commands or working directories
+
+**Solution**: Always use direct node commands with absolute paths instead of npm scripts
+
+❌ **Don't use**:
+```json
+{
+  "command": "npm",
+  "args": ["run", "start:prod"],
+  "cwd": "/path/to/project"
+}
+```
+
+✅ **Use instead**:
+```json
+{
+  "command": "node",
+  "args": ["/absolute/path/to/project/dist/server.js"],
+  "env": {
+    "N8N_BASE_URL": "...",
+    "N8N_API_KEY": "..."
+  }
+}
+```
+
 ## Getting Help
 
 If issues persist:
@@ -286,4 +424,8 @@ If issues persist:
 | Missing .env | `cp env.example .env` |
 | TypeScript errors | `npm install typescript && npm run build` |
 | Permission denied | `sudo` or add user to docker group |
-| Module not found | `rm -rf node_modules && npm install` | 
+| Module not found | `rm -rf node_modules && npm install` |
+| **MCP client closed** | **Use absolute path in mcp.json + env vars** |
+| **Missing npm script** | **Use node command instead of npm** |
+| **Cannot find module** | **Check absolute path in mcp.json args** |
+| **MCP no tools listed** | **Restart MCP client completely** | 
