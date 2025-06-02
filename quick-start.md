@@ -165,45 +165,101 @@ In your MCP client (Cursor/Claude), try:
 - Project management (Enterprise feature)
 - Advanced user management (Enterprise feature)
 
-## 🎯 Key Features
+## 🎯 Available Tools (40 Total)
 
-Now that your MCP server is running, you have access to powerful n8n automation tools:
+Now that your MCP server is running, you have access to **40 powerful n8n automation tools** organized into two categories:
 
-### 🔍 **Smart Workflow Search**
-Search through real working workflow examples by node types or keywords:
-- Find workflows using specific nodes (e.g., OpenAI, Slack, webhooks)
-- Discover implementation patterns and best practices
-- Get relevant examples without overwhelming your context
+### ✅ **Immediate Access Tools (5 Tools)**
+These work instantly without needing n8n API connection:
 
-### 🧠 **Node Intelligence**
-- Complete information about all n8n built-in nodes
-- Parameter details and usage examples
-- Node categories and descriptions
+- **`node_categories`** - Browse all n8n node categories with descriptions
+- **`node_types_list`** - List available built-in n8n node types with filtering
+- **`node_type_info`** - Get detailed information about specific node types
+- **`workflow_examples`** - Get example workflow structures for common use cases
+- **`workflow_examples_search`** - 🆕 Smart search through real working workflow examples
 
-### ⚙️ **Workflow Management**
-- Create, update, and manage workflows programmatically
-- Monitor executions and debug issues
-- Organize with tags and projects
+### 🔌 **n8n API Tools (35 Tools)**
+These require a connected n8n instance with valid API credentials:
+
+#### **Core Workflow Management (8 tools)**
+Create, update, delete, activate/deactivate workflows, transfer between projects
+
+#### **Execution Monitoring (3 tools)**
+Monitor workflow executions, get detailed debugging information, manage execution history
+
+#### **Organization & Tags (7 tools)**
+Create and manage tags for workflow organization, assign tags to workflows
+
+#### **Environment Variables (4 tools)**
+Manage environment variables for secure configuration across workflows
+
+#### **Project Management (4 tools)**
+Create and manage projects for organizing workflows (Enterprise feature)
+
+#### **User Management (5 tools)**
+List, create, update, and delete users; manage roles and permissions (Enterprise feature)
+
+#### **Security & Administration (2 tools)**
+Generate security audit reports, pull changes from source control
+
+#### **Credential Management (2 tools)**
+Create and delete credentials for workflow authentication
 
 ## 🚀 Try These Examples
 
-In your MCP client (Cursor/Claude), try these commands:
+In your MCP client (Cursor/Claude), try these commands to test the tools:
 
-1. **Find AI-related workflows:**
-   - Tool: `workflow_examples_search`
-   - Parameters: `{"keywords": ["ai", "agent"], "maxExamples": 1}`
+### ✅ **Immediate Access Examples (Work Without API)**
 
-2. **Learn about webhook nodes:**
-   - Tool: `node_type_info`
-   - Parameters: `{"nodeType": "n8n-nodes-base.webhook"}`
+1. **Browse all node categories:**
+   ```
+   Tool: node_categories
+   Parameters: {}
+   ```
 
-3. **Browse all node categories:**
-   - Tool: `node_categories`
-   - Parameters: `{}`
+2. **Find specific node types:**
+   ```
+   Tool: node_types_list  
+   Parameters: {"category": "Core", "search": "webhook"}
+   ```
 
-4. **List your workflows:**
-   - Tool: `workflow_list`
-   - Parameters: `{"limit": 5}`
+3. **Learn about webhook nodes:**
+   ```
+   Tool: node_type_info
+   Parameters: {"nodeType": "n8n-nodes-base.webhook"}
+   ```
+
+4. **Get workflow examples:**
+   ```
+   Tool: workflow_examples
+   Parameters: {"useCase": "simple-webhook"}
+   ```
+
+5. **Search workflow examples (if examples/ folder exists):**
+   ```
+   Tool: workflow_examples_search
+   Parameters: {"keywords": ["webhook", "api"], "maxExamples": 2}
+   ```
+
+### 🔌 **n8n API Examples (Require Connected Instance)**
+
+6. **List your workflows:**
+   ```
+   Tool: workflow_list
+   Parameters: {"limit": 5, "active": true}
+   ```
+
+7. **Monitor recent executions:**
+   ```
+   Tool: execution_list
+   Parameters: {"limit": 10, "status": "error"}
+   ```
+
+8. **Generate security audit:**
+   ```
+   Tool: audit_generate
+   Parameters: {"additionalOptions": {"categories": ["credentials", "nodes"]}}
+   ```
 
 ## 📚 Next Steps
 

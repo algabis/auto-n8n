@@ -88,6 +88,29 @@ make status
 docker-compose ps
 ```
 
+### 🧪 **Testing Tools Immediately**
+
+Once the server is running, **5 tools work immediately** without needing n8n API configuration:
+
+```bash
+# Test that the server and tools are working
+# You can try these in your MCP client right away:
+
+# 1. Browse node categories
+Tool: node_categories, Parameters: {}
+
+# 2. List webhook-related nodes  
+Tool: node_types_list, Parameters: {"search": "webhook"}
+
+# 3. Get detailed webhook node info
+Tool: node_type_info, Parameters: {"nodeType": "n8n-nodes-base.webhook"}
+
+# 4. Get a workflow example
+Tool: workflow_examples, Parameters: {"useCase": "simple-webhook"}
+```
+
+The other **35 tools require a connected n8n instance** with API credentials configured.
+
 ### Docker Commands
 
 ```bash
@@ -258,9 +281,18 @@ When using deployment scripts, the following validations are performed:
 - ✅ Optional API connectivity test
 - ✅ Container health monitoring
 
-## Available Tools
+## Available Tools (40 Total)
 
-### Node Information & Examples
+Auto-n8n provides exactly **40 MCP tools** to stay within LLM compatibility limits. The tools are organized into two categories:
+
+### ✅ **Immediate Access Tools (5 Tools)**
+These tools work immediately without requiring n8n API connection:
+
+#### `node_categories`
+List all node categories with descriptions and node counts.
+```json
+{}
+```
 
 #### `node_types_list`
 List all available built-in n8n node types with categories and descriptions.
@@ -279,6 +311,14 @@ Get detailed information about a specific node type including parameters and usa
 }
 ```
 
+#### `workflow_examples`
+Get example workflow structures for common use cases.
+```json
+{
+  "useCase": "simple-webhook"
+}
+```
+
 #### `workflow_examples_search`
 🆕 **Smart search through real working workflow examples**. Find workflows that use specific nodes or match keywords. Perfect for learning how nodes are actually implemented.
 ```json
@@ -290,120 +330,124 @@ Get detailed information about a specific node type including parameters and usa
 }
 ```
 
-**Use this when you need to see real implementations of:**
-- Specific n8n nodes in working workflows
-- Similar use cases and patterns
-- Node combinations and configurations
-- Data flow patterns between nodes
+**Use these immediate access tools when you need to:**
+- 📚 Learn about n8n nodes and their capabilities
+- 🔍 Find workflow examples and implementation patterns
+- 📖 Understand node parameters and configurations
+- 🏗️ Design workflows before implementing them
 
-### Workflow Tools
+### 🔌 **n8n API Tools (35 Tools)**
+These tools require a connected n8n instance with valid API credentials:
 
-#### `workflow_list`
-List all workflows with filtering options.
+#### **Workflow Management (8 tools)**
+- `workflow_list` - List all workflows with filtering options
+- `workflow_get` - Get detailed workflow information  
+- `workflow_create` - Create new workflows programmatically
+- `workflow_update` - Update existing workflow properties
+- `workflow_delete` - Delete workflows permanently
+- `workflow_transfer` - Transfer workflows between projects
+- `workflow_activate` - Activate workflows for automatic execution
+- `workflow_deactivate` - Deactivate workflows to stop execution
+
+#### **Execution Monitoring (3 tools)**
+- `execution_list` - Monitor workflow executions with filtering
+- `execution_get` - Get detailed execution information for debugging
+- `execution_delete` - Delete execution records
+
+#### **Tag Management (7 tools)**
+- `tag_list` - List all available tags for organization
+- `tag_create` - Create new tags for organizing workflows
+- `tag_get` - Get detailed information about specific tags
+- `tag_update` - Update existing tag names
+- `tag_delete` - Delete tags permanently
+- `workflow_tags_get` - Get all tags assigned to a workflow
+- `workflow_tags_update` - Update tags assigned to workflows
+
+#### **Variable Management (4 tools)**
+- `variable_list` - List all environment variables
+- `variable_create` - Create new environment variables
+- `variable_update` - Update existing environment variables
+- `variable_delete` - Delete environment variables
+
+#### **Project Management (4 tools)**
+- `project_list` - List all projects
+- `project_create` - Create new projects
+- `project_update` - Update project properties
+- `project_delete` - Delete projects
+
+#### **User Management (5 tools)**
+- `user_list` - List all users in the n8n instance
+- `user_get` - Get detailed user information
+- `user_create` - Create new users and send invitations
+- `user_role_change` - Change user roles and permissions
+- `user_delete` - Delete user accounts
+
+#### **Security & Administration (2 tools)**
+- `audit_generate` - Generate comprehensive security audit reports
+- `source_control_pull` - Pull changes from connected Git repositories
+
+#### **Credential Management (2 tools)**
+- `credential_create` - Create new credentials for workflow authentication
+- `credential_delete` - Delete credentials permanently
+
+### 📝 **Example Usage**
+
+#### Workflow Management
 ```json
+// List active workflows
 {
-  "active": true,
-  "tags": "production,staging",
-  "name": "Data Processing",
-  "limit": 50
+  "tool": "workflow_list",
+  "args": {
+    "active": true,
+    "limit": 10
+  }
 }
-```
 
-#### `workflow_get`
-Get detailed information about a specific workflow.
-```json
+// Create a simple webhook workflow
 {
-  "id": "workflow-id-here",
-  "excludePinnedData": true
-}
-```
-
-#### `workflow_create`
-Create a new workflow programmatically.
-```json
-{
-  "name": "My New Workflow",
-  "nodes": [
-    {
-      "name": "Start",
-      "type": "n8n-nodes-base.start",
-      "position": [250, 300]
+  "tool": "workflow_create", 
+  "args": {
+    "name": "My Webhook Handler",
+    "nodes": [
+      {
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "my-webhook"
+        },
+        "position": [0, 0]
+      }
+    ],
+    "connections": {},
+    "settings": {
+      "saveExecutionProgress": false,
+      "saveManualExecutions": false,
+      "saveDataErrorExecution": "all",
+      "saveDataSuccessExecution": "all"
     }
-  ],
-  "connections": {},
-  "active": false
+  }
 }
 ```
 
-#### `workflow_activate` / `workflow_deactivate`
-Control workflow activation status.
+#### Monitoring & Debugging
 ```json
+// Monitor failed executions
 {
-  "id": "workflow-id-here"
+  "tool": "execution_list",
+  "args": {
+    "status": "error",
+    "limit": 20,
+    "includeData": false
+  }
 }
-```
 
-### Execution Tools
-
-#### `execution_list`
-Monitor workflow executions with filtering.
-```json
+// Get detailed execution data for debugging
 {
-  "status": "error",
-  "workflowId": "workflow-id",
-  "includeData": false,
-  "limit": 100
-}
-```
-
-#### `execution_get`
-Get detailed execution information for debugging.
-```json
-{
-  "id": "execution-id-here",
-  "includeData": true
-}
-```
-
-### Tag Management
-
-#### `tag_create`
-Create organization tags for workflows.
-```json
-{
-  "name": "Production"
-}
-```
-
-#### `workflow_tags_update`
-Assign tags to workflows for organization.
-```json
-{
-  "id": "workflow-id",
-  "tagIds": ["tag-id-1", "tag-id-2"]
-}
-```
-
-### Variable Management
-
-#### `variable_create`
-Create environment variables for workflows.
-```json
-{
-  "key": "API_ENDPOINT",
-  "value": "https://api.example.com"
-}
-```
-
-### Security & Auditing
-
-#### `audit_generate`
-Generate comprehensive security audit reports.
-```json
-{
-  "additionalOptions": {
-    "daysAbandonedWorkflow": 90,
-    "categories": ["credentials", "database", "nodes"]
+  "tool": "execution_get",
+  "args": {
+    "id": "execution-id-here",
+    "includeData": true
   }
 }
 ```

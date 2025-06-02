@@ -363,8 +363,8 @@ class N8nMcpServer {
     // List available tools
     this.server.setRequestHandler(ListToolsRequestSchema, async () => (
       {
-        tools: [
-          // Node information tools
+                tools: [
+          // Node information tools (custom)
           {
             name: "node_types_list",
             description: "List all available built-in n8n node types with categories and descriptions",
@@ -451,6 +451,305 @@ class N8nMcpServer {
             }
           },
 
+          // User Management Tools
+          {
+            name: "user_list",
+            description: "List all users in the n8n instance",
+            inputSchema: {
+              type: "object",
+              properties: {
+                limit: { type: "number", minimum: 1, maximum: 250, default: 100 },
+                cursor: { type: "string", description: "Pagination cursor" },
+                includeRole: { type: "boolean", description: "Include user roles in response" },
+                projectId: { type: "string", description: "Filter users by project" }
+              }
+            }
+          },
+          {
+            name: "user_get",
+            description: "Get detailed information about a specific user",
+            inputSchema: {
+              type: "object",
+              properties: {
+                identifier: { type: "string", description: "User ID or email address" },
+                includeRole: { type: "boolean", description: "Include user role in response" }
+              },
+              required: ["identifier"]
+            }
+          },
+          {
+            name: "user_create",
+            description: "Create new users in the n8n instance",
+            inputSchema: {
+              type: "object",
+              properties: {
+                users: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      email: { type: "string", format: "email", description: "User email address" },
+                      role: { type: "string", enum: ["global:admin", "global:member"], description: "User role" }
+                    },
+                    required: ["email"]
+                  },
+                  description: "Array of users to create"
+                }
+              },
+              required: ["users"]
+            }
+          },
+          {
+            name: "user_role_change",
+            description: "Change a user's global role",
+            inputSchema: {
+              type: "object",
+              properties: {
+                identifier: { type: "string", description: "User ID or email address" },
+                newRoleName: { type: "string", enum: ["global:admin", "global:member"], description: "New role for the user" }
+              },
+              required: ["identifier", "newRoleName"]
+            }
+          },
+          {
+            name: "user_delete",
+            description: "Delete a user from the n8n instance",
+            inputSchema: {
+              type: "object",
+              properties: {
+                identifier: { type: "string", description: "User ID or email address" }
+              },
+              required: ["identifier"]
+            }
+          },
+
+          // Source Control Tools
+          {
+            name: "source_control_pull",
+            description: "Pull changes from the connected source control repository",
+            inputSchema: {
+              type: "object",
+              properties: {
+                force: { type: "boolean", description: "Force pull even if there are conflicts" },
+                variables: { type: "object", description: "Environment variables to set during pull", additionalProperties: { type: "string" } }
+              }
+            }
+          },
+
+          // Security and Audit Tools
+          {
+            name: "audit_generate",
+            description: "Generate a comprehensive security audit report",
+            inputSchema: {
+              type: "object",
+              properties: {
+                additionalOptions: {
+                  type: "object",
+                  properties: {
+                    daysAbandonedWorkflow: { type: "number", description: "Days to consider a workflow abandoned if not executed" },
+                    categories: {
+                      type: "array",
+                      items: { type: "string", enum: ["credentials", "database", "nodes", "filesystem", "instance"] },
+                      description: "Audit categories to include"
+                    }
+                  }
+                }
+              }
+            }
+          },
+
+          // Project Management Tools
+          {
+            name: "project_list",
+            description: "List all projects",
+            inputSchema: {
+              type: "object",
+              properties: {
+                limit: { type: "number", minimum: 1, maximum: 250, default: 100 },
+                cursor: { type: "string", description: "Pagination cursor" }
+              }
+            }
+          },
+          {
+            name: "project_create",
+            description: "Create a new project",
+            inputSchema: {
+              type: "object",
+              properties: {
+                name: { type: "string", description: "Project name" }
+              },
+              required: ["name"]
+            }
+          },
+          {
+            name: "project_update",
+            description: "Update a project's properties",
+            inputSchema: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "Project ID" },
+                name: { type: "string", description: "New project name" }
+              },
+              required: ["id", "name"]
+            }
+          },
+          {
+            name: "project_delete",
+            description: "Delete a project",
+            inputSchema: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "Project ID to delete" }
+              },
+              required: ["id"]
+            }
+          },
+
+          // Variable Management Tools
+          {
+            name: "variable_list",
+            description: "List all environment variables",
+            inputSchema: {
+              type: "object",
+              properties: {
+                limit: { type: "number", minimum: 1, maximum: 250, default: 100 },
+                cursor: { type: "string", description: "Pagination cursor" }
+              }
+            }
+          },
+          {
+            name: "variable_create",
+            description: "Create a new environment variable",
+            inputSchema: {
+              type: "object",
+              properties: {
+                key: { 
+                  type: "string", 
+                  description: "Variable key/name (must be unique, alphanumeric + underscore)",
+                  pattern: "^[A-Za-z_][A-Za-z0-9_]*$"
+                },
+                value: { 
+                  type: "string", 
+                  description: "Variable value (stored encrypted)" 
+                }
+              },
+              required: ["key", "value"]
+            }
+          },
+          {
+            name: "variable_update",
+            description: "Update an existing environment variable",
+            inputSchema: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "Variable ID" },
+                key: { type: "string", description: "Variable key/name" },
+                value: { type: "string", description: "Variable value" }
+              },
+              required: ["id", "key", "value"]
+            }
+          },
+          {
+            name: "variable_delete",
+            description: "Delete an environment variable",
+            inputSchema: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "Variable ID to delete" }
+              },
+              required: ["id"]
+            }
+          },
+
+          // Tag Management Tools
+          {
+            name: "tag_list",
+            description: "List all available tags for workflow organization",
+            inputSchema: {
+              type: "object",
+              properties: {
+                limit: { type: "number", minimum: 1, maximum: 250, default: 100 },
+                cursor: { type: "string", description: "Pagination cursor" }
+              }
+            }
+          },
+          {
+            name: "tag_create",
+            description: "Create a new tag for organizing workflows",
+            inputSchema: {
+              type: "object",
+              properties: {
+                name: { 
+                  type: "string", 
+                  description: "Tag name (must be unique)",
+                  minLength: 1
+                }
+              },
+              required: ["name"]
+            }
+          },
+          {
+            name: "tag_get",
+            description: "Get detailed information about a specific tag",
+            inputSchema: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "Tag ID" }
+              },
+              required: ["id"]
+            }
+          },
+          {
+            name: "tag_update",
+            description: "Update an existing tag's name",
+            inputSchema: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "Tag ID" },
+                name: { type: "string", description: "New tag name (must be unique)" }
+              },
+              required: ["id", "name"]
+            }
+          },
+          {
+            name: "tag_delete",
+            description: "Delete a tag permanently",
+            inputSchema: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "Tag ID to delete" }
+              },
+              required: ["id"]
+            }
+          },
+          {
+            name: "workflow_tags_get",
+            description: "Get all tags assigned to a specific workflow",
+            inputSchema: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "Workflow ID" }
+              },
+              required: ["id"]
+            }
+          },
+          {
+            name: "workflow_tags_update",
+            description: "Update the tags assigned to a workflow",
+            inputSchema: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "Workflow ID" },
+                tagIds: { 
+                  type: "array", 
+                  items: { type: "string" }, 
+                  description: "Array of tag IDs to assign (replaces all existing tags)" 
+                }
+              },
+              required: ["id", "tagIds"]
+            }
+          },
+
           // Workflow Tools
           {
             name: "workflow_list",
@@ -461,7 +760,7 @@ class N8nMcpServer {
                 active: { type: "boolean", description: "Filter by active/inactive status" },
                 tags: { type: "string", description: "Comma-separated list of tag names to filter by" },
                 name: { type: "string", description: "Filter workflows by name (partial match)" },
-                projectId: { type: "string", description: "Filter by project ID (Enterprise)" },
+                projectId: { type: "string", description: "Filter by project ID" },
                 excludePinnedData: { type: "boolean", description: "Exclude pinned data for faster loading" },
                 limit: { type: "number", description: "Maximum number of workflows to return", maximum: 250, minimum: 1, default: 100 },
                 cursor: { type: "string", description: "Pagination cursor for next page" }
@@ -469,7 +768,7 @@ class N8nMcpServer {
             }
           },
           {
-            name: "workflow_get", 
+            name: "workflow_get",
             description: "Get detailed information about a specific workflow",
             inputSchema: {
               type: "object",
@@ -579,6 +878,18 @@ class N8nMcpServer {
             }
           },
           {
+            name: "workflow_transfer",
+            description: "Transfer a workflow to another project",
+            inputSchema: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "Workflow ID to transfer" },
+                destinationProjectId: { type: "string", description: "Target project ID" }
+              },
+              required: ["id", "destinationProjectId"]
+            }
+          },
+          {
             name: "workflow_activate",
             description: "Activate a workflow to enable automatic execution",
             inputSchema: {
@@ -600,18 +911,6 @@ class N8nMcpServer {
               required: ["id"]
             }
           },
-          {
-            name: "workflow_transfer",
-            description: "Transfer a workflow to another project (Enterprise feature)",
-            inputSchema: {
-              type: "object",
-              properties: {
-                id: { type: "string", description: "Workflow ID to transfer" },
-                destinationProjectId: { type: "string", description: "Target project ID" }
-              },
-              required: ["id", "destinationProjectId"]
-            }
-          },
 
           // Execution Tools
           {
@@ -623,7 +922,7 @@ class N8nMcpServer {
                 includeData: { type: "boolean", description: "Include execution data in response (slower but more detailed)" },
                 status: { type: "string", enum: ["error", "success", "waiting"], description: "Filter by execution status" },
                 workflowId: { type: "string", description: "Filter by specific workflow ID" },
-                projectId: { type: "string", description: "Filter by project ID (Enterprise)" },
+                projectId: { type: "string", description: "Filter by project ID" },
                 limit: { type: "number", minimum: 1, maximum: 250, default: 100 },
                 cursor: { type: "string", description: "Pagination cursor" }
               }
@@ -653,187 +952,6 @@ class N8nMcpServer {
             }
           },
 
-          // Tag Management Tools
-          {
-            name: "tag_list",
-            description: "List all available tags for workflow organization",
-            inputSchema: {
-              type: "object",
-              properties: {
-                limit: { type: "number", minimum: 1, maximum: 250, default: 100 },
-                cursor: { type: "string", description: "Pagination cursor" }
-              }
-            }
-          },
-          {
-            name: "tag_create",
-            description: "Create a new tag for organizing workflows",
-            inputSchema: {
-              type: "object",
-              properties: {
-                name: { 
-                  type: "string", 
-                  description: "Tag name (must be unique)",
-                  minLength: 1
-                }
-              },
-              required: ["name"]
-            }
-          },
-          {
-            name: "tag_update",
-            description: "Update an existing tag's name",
-            inputSchema: {
-              type: "object",
-              properties: {
-                id: { type: "string", description: "Tag ID" },
-                name: { type: "string", description: "New tag name (must be unique)" }
-              },
-              required: ["id", "name"]
-            }
-          },
-          {
-            name: "tag_delete",
-            description: "Delete a tag permanently",
-            inputSchema: {
-              type: "object",
-              properties: {
-                id: { type: "string", description: "Tag ID to delete" }
-              },
-              required: ["id"]
-            }
-          },
-          {
-            name: "workflow_tags_get",
-            description: "Get all tags assigned to a specific workflow",
-            inputSchema: {
-              type: "object",
-              properties: {
-                id: { type: "string", description: "Workflow ID" }
-              },
-              required: ["id"]
-            }
-          },
-          {
-            name: "workflow_tags_update",
-            description: "Update the tags assigned to a workflow",
-            inputSchema: {
-              type: "object",
-              properties: {
-                id: { type: "string", description: "Workflow ID" },
-                tagIds: { 
-                  type: "array", 
-                  items: { type: "string" }, 
-                  description: "Array of tag IDs to assign (replaces all existing tags)" 
-                }
-              },
-              required: ["id", "tagIds"]
-            }
-          },
-
-          // Variable Management Tools
-          {
-            name: "variable_list",
-            description: "List all environment variables",
-            inputSchema: {
-              type: "object",
-              properties: {
-                limit: { type: "number", minimum: 1, maximum: 250, default: 100 },
-                cursor: { type: "string", description: "Pagination cursor" }
-              }
-            }
-          },
-          {
-            name: "variable_create",
-            description: "Create a new environment variable",
-            inputSchema: {
-              type: "object",
-              properties: {
-                key: { 
-                  type: "string", 
-                  description: "Variable key/name (must be unique, alphanumeric + underscore)",
-                  pattern: "^[A-Za-z_][A-Za-z0-9_]*$"
-                },
-                value: { 
-                  type: "string", 
-                  description: "Variable value (stored encrypted)" 
-                }
-              },
-              required: ["key", "value"]
-            }
-          },
-          {
-            name: "variable_update",
-            description: "Update an existing environment variable",
-            inputSchema: {
-              type: "object",
-              properties: {
-                id: { type: "string", description: "Variable ID" },
-                key: { type: "string", description: "Variable key/name" },
-                value: { type: "string", description: "Variable value" }
-              },
-              required: ["id", "key", "value"]
-            }
-          },
-          {
-            name: "variable_delete",
-            description: "Delete an environment variable",
-            inputSchema: {
-              type: "object",
-              properties: {
-                id: { type: "string", description: "Variable ID to delete" }
-              },
-              required: ["id"]
-            }
-          },
-
-          // Project Management Tools (Enterprise)
-          {
-            name: "project_list",
-            description: "List all projects (Enterprise feature)",
-            inputSchema: {
-              type: "object",
-              properties: {
-                limit: { type: "number", minimum: 1, maximum: 250, default: 100 },
-                cursor: { type: "string", description: "Pagination cursor" }
-              }
-            }
-          },
-          {
-            name: "project_create",
-            description: "Create a new project (Enterprise feature)",
-            inputSchema: {
-              type: "object",
-              properties: {
-                name: { type: "string", description: "Project name" }
-              },
-              required: ["name"]
-            }
-          },
-          {
-            name: "project_update",
-            description: "Update a project's properties (Enterprise feature)",
-            inputSchema: {
-              type: "object",
-              properties: {
-                id: { type: "string", description: "Project ID" },
-                name: { type: "string", description: "New project name" }
-              },
-              required: ["id", "name"]
-            }
-          },
-          {
-            name: "project_delete",
-            description: "Delete a project (Enterprise feature)",
-            inputSchema: {
-              type: "object",
-              properties: {
-                id: { type: "string", description: "Project ID to delete" }
-              },
-              required: ["id"]
-            }
-          },
-
           // Credential Management Tools
           {
             name: "credential_create",
@@ -848,6 +966,7 @@ class N8nMcpServer {
               required: ["name", "type", "data"]
             }
           },
+
           {
             name: "credential_delete",
             description: "Delete a credential permanently",
@@ -855,149 +974,6 @@ class N8nMcpServer {
               type: "object",
               properties: {
                 id: { type: "string", description: "Credential ID to delete" }
-              },
-              required: ["id"]
-            }
-          },
-          {
-            name: "credential_schema_get",
-            description: "Get the schema for a specific credential type",
-            inputSchema: {
-              type: "object",
-              properties: {
-                credentialTypeName: { type: "string", description: "Credential type name (e.g., 'httpBasicAuth')" }
-              },
-              required: ["credentialTypeName"]
-            }
-          },
-          {
-            name: "credential_transfer",
-            description: "Transfer a credential to another project (Enterprise feature)",
-            inputSchema: {
-              type: "object",
-              properties: {
-                id: { type: "string", description: "Credential ID" },
-                destinationProjectId: { type: "string", description: "Target project ID" }
-              },
-              required: ["id", "destinationProjectId"]
-            }
-          },
-
-          // Security and Audit Tools
-          {
-            name: "audit_generate",
-            description: "Generate a comprehensive security audit report",
-            inputSchema: {
-              type: "object",
-              properties: {
-                additionalOptions: {
-                  type: "object",
-                  properties: {
-                    daysAbandonedWorkflow: { type: "number", description: "Days to consider a workflow abandoned if not executed" },
-                    categories: {
-                      type: "array",
-                      items: { type: "string", enum: ["credentials", "database", "nodes", "filesystem", "instance"] },
-                      description: "Audit categories to include"
-                    }
-                  }
-                }
-              }
-            }
-          },
-
-          // User Management Tools (Enterprise)
-          {
-            name: "user_list",
-            description: "List all users in the n8n instance (Enterprise feature)",
-            inputSchema: {
-              type: "object",
-              properties: {
-                limit: { type: "number", minimum: 1, maximum: 250, default: 100 },
-                cursor: { type: "string", description: "Pagination cursor" },
-                includeRole: { type: "boolean", description: "Include user roles in response" },
-                projectId: { type: "string", description: "Filter users by project" }
-              }
-            }
-          },
-          {
-            name: "user_get",
-            description: "Get detailed information about a specific user (Enterprise feature)",
-            inputSchema: {
-              type: "object",
-              properties: {
-                identifier: { type: "string", description: "User ID or email address" },
-                includeRole: { type: "boolean", description: "Include user role in response" }
-              },
-              required: ["identifier"]
-            }
-          },
-          {
-            name: "user_create",
-            description: "Create new users in the n8n instance (Enterprise feature)",
-            inputSchema: {
-              type: "object",
-              properties: {
-                users: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      email: { type: "string", format: "email", description: "User email address" },
-                      role: { type: "string", enum: ["global:admin", "global:member"], description: "User role" }
-                    },
-                    required: ["email"]
-                  },
-                  description: "Array of users to create"
-                }
-              },
-              required: ["users"]
-            }
-          },
-          {
-            name: "user_delete",
-            description: "Delete a user from the n8n instance (Enterprise feature)",
-            inputSchema: {
-              type: "object",
-              properties: {
-                identifier: { type: "string", description: "User ID or email address" }
-              },
-              required: ["identifier"]
-            }
-          },
-          {
-            name: "user_role_change",
-            description: "Change a user's global role (Enterprise feature)",
-            inputSchema: {
-              type: "object",
-              properties: {
-                identifier: { type: "string", description: "User ID or email address" },
-                newRoleName: { type: "string", enum: ["global:admin", "global:member"], description: "New role for the user" }
-              },
-              required: ["identifier", "newRoleName"]
-            }
-          },
-
-          // Source Control Tools
-          {
-            name: "source_control_pull",
-            description: "Pull changes from the connected source control repository",
-            inputSchema: {
-              type: "object",
-              properties: {
-                force: { type: "boolean", description: "Force pull even if there are conflicts" },
-                variables: { type: "object", description: "Environment variables to set during pull", additionalProperties: { type: "string" } }
-              }
-            }
-          },
-
-          // Additional Tag Tool
-          {
-            name: "tag_get",
-            description: "Get detailed information about a specific tag",
-            inputSchema: {
-              type: "object",
-              properties: {
-                id: { type: "string", description: "Tag ID" }
               },
               required: ["id"]
             }
