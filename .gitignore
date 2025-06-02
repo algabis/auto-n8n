@@ -10,3 +10,7 @@ node_modules/
 .env
 .\node_modules
 .cursor
+plan.md
+technical-guide.md
+ignore/
+
