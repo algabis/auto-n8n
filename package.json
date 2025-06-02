@@ -54,10 +54,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/auto-n8n.git"
+    "url": "https://github.com/algabis/auto-n8n.git"
   },
   "bugs": {
-    "url": "https://github.com/your-org/auto-n8n/issues"
+    "url": "https://github.com/algabis/auto-n8n/issues"
   },
-  "homepage": "https://github.com/your-org/auto-n8n#readme"
+  "homepage": "https://github.com/algabis/auto-n8n#readme"
 }

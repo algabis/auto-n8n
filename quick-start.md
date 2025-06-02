@@ -14,7 +14,7 @@ Get your Auto-n8n MCP server running in 5 minutes! 🚀
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/your-org/auto-n8n
+git clone https://github.com/algabis/auto-n8n
 cd auto-n8n
 npm install
 
@@ -31,7 +31,7 @@ npm start
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/your-org/auto-n8n
+git clone https://github.com/algabis/auto-n8n
 cd auto-n8n
 
 # 2. Configure environment
