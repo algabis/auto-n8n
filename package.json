@@ -1,6 +1,6 @@
 {
   "name": "@algabis/auto-n8n",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Model Context Protocol server for automated n8n workflow management",
   "main": "dist/server.js",
   "type": "module",
